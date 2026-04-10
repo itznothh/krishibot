@@ -7,7 +7,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 
-from modules.weather import get_weather_data, get_farming_weather_advice
+from modules.weather import get_weather
 from modules.crop_recommender import recommend_crops
 from modules.pest_advisor import get_pest_advice
 from modules.fertilizer import get_fertilizer_advice
