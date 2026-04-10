@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KrishiBot — Smart Farming Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=Mukta:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --earth:      #2D4A1E;
+      --leaf:       #4A7C2F;
+      --lime:       #7DB94E;
+      --sky:        #E8F4E1;
+      --sun:        #F5A623;
+      --sun-light:  #FFF3DC;
+      --soil:       #8B5E3C;
+      --soil-light: #F5EDE4;
+      --white:      #FAFCF8;
+      --cloud:      #EEF5E8;
+      --text:       #1A2E10;
+      --text-mid:   #4A5E3A;
+      --text-soft:  #7A8F6A;
+      --border:     #C8DDB8;
+      --shadow:     rgba(45, 74, 30, 0.12);
+      --radius:     18px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Mukta', sans-serif;
+      background: var(--sky);
+      color: var(--text);
+    }
+
+    /* ─── App Shell ─── */
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      max-width: 820px;
+      margin: 0 auto;
+      background: var(--white);
+      box-shadow: 0 0 60px rgba(45,74,30,0.15);
+      position: relative;
+    }
+
+    /* ─── Header ─── */
+    header {
+      background: linear-gradient(135deg, var(--earth) 0%, var(--leaf) 100%);
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+      min-height: 70px;
+    }
+
+    header::before {
+      content: "";
+      position: absolute;
+      right: -20px;
+      top: -30px;
+      width: 180px;
+      height: 180px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 50%;
+    }
+
+    header::after {
+      content: "🌾🌿🌱";
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 22px;
+      opacity: 0.4;
+      letter-spacing: 4px;
+    }
+
+    .logo-wrap {
+      width: 46px;
+      height: 46px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+      border: 1.5px solid rgba(255,255,255,0.2);
+    }
+
+    .header-text { flex: 1; }
+    .header-title {
+      font-family: 'Baloo 2', cursive;
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.1;
+    }
+    .header-sub {
+      font-size: 12px;
+      color: rgba(255,255,255,0.7);
+      font-weight: 400;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      background: var(--lime);
+      border-radius: 50%;
+      box-shadow: 0 0 0 3px rgba(125,185,78,0.3);
+      animation: pulse 2s infinite;
+      margin-right: 6px;
+      display: inline-block;
+    }
+    @keyframes pulse { 0%,100%{transform:scale(1)}50%{transform:scale(1.3)} }
+
+    /* ─── Language Bar ─── */
+    .lang-bar {
+      background: var(--cloud);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .lang-label { font-size: 12px; color: var(--text-soft); font-weight: 500; }
+    .lang-btn {
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1.5px solid var(--border);
+      background: var(--white);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--text-mid);
+      transition: all .2s;
+      font-family: 'Mukta', sans-serif;
+    }
+    .lang-btn:hover { background: var(--leaf); color: #fff; border-color: var(--leaf); }
+    .lang-btn.active { background: var(--leaf); color: #fff; border-color: var(--leaf); }
+
+    /* ─── Quick Actions ─── */
+    .quick-actions {
+      padding: 10px 16px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--white);
+      scrollbar-width: none;
+    }
+    .quick-actions::-webkit-scrollbar { display: none; }
+
+    .qa-btn {
+      white-space: nowrap;
+      padding: 7px 14px;
+      border-radius: 22px;
+      border: 1.5px solid var(--border);
+      background: var(--white);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--text-mid);
+      transition: all .2s;
+      font-family: 'Mukta', sans-serif;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+    .qa-btn:hover {
+      background: var(--sky);
+      border-color: var(--leaf);
+      color: var(--earth);
+      transform: translateY(-1px);
+    }
+
+    /* ─── Chat Area ─── */
+    .chat-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scroll-behavior: smooth;
+    }
+
+    /* Welcome banner */
+    .welcome {
+      background: linear-gradient(135deg, #E8F5DC, #F5F0E8);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+    }
+    .welcome-icon { font-size: 42px; margin-bottom: 8px; }
+    .welcome h2 {
+      font-family: 'Baloo 2', cursive;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--earth);
+      margin-bottom: 6px;
+    }
+    .welcome p { font-size: 14px; color: var(--text-mid); line-height: 1.6; }
+
+    /* ─── Message Bubbles ─── */
+    .msg-row {
+      display: flex;
+      gap: 10px;
+      animation: slideIn .25s ease-out;
+    }
+    @keyframes slideIn {
+      from { opacity:0; transform: translateY(10px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+
+    .msg-row.user { flex-direction: row-reverse; }
+
+    .avatar {
+      width: 36px; height: 36px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .bot-avatar { background: linear-gradient(135deg, var(--leaf), var(--earth)); }
+    .user-avatar { background: linear-gradient(135deg, var(--sun), #E08B00); }
+
+    .bubble {
+      max-width: 78%;
+      padding: 12px 16px;
+      border-radius: 18px;
+      font-size: 14px;
+      line-height: 1.65;
+      position: relative;
+    }
+    .bot-bubble {
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-bottom-left-radius: 4px;
+      color: var(--text);
+      box-shadow: 0 2px 8px var(--shadow);
+    }
+    .user-bubble {
+      background: linear-gradient(135deg, var(--earth), var(--leaf));
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    /* Markdown-style rendering inside bubbles */
+    .bubble strong { font-weight: 700; }
+    .bubble em { font-style: italic; opacity: 0.85; font-size: 13px; }
+    .bubble br + br { display: none; }
+
+    /* Module badge */
+    .module-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .badge-weather { background: #DBEFFE; color: #1565C0; }
+    .badge-crop    { background: #E8F5E9; color: #2E7D32; }
+    .badge-pest    { background: #FFF3E0; color: #E65100; }
+    .badge-fertilizer { background: #F3E5F5; color: #6A1B9A; }
+    .badge-ai      { background: var(--sky); color: var(--earth); }
+
+    /* Typing indicator */
+    .typing-row { display: flex; gap: 10px; align-items: flex-end; }
+    .typing-bubble {
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: 18px;
+      border-bottom-left-radius: 4px;
+      padding: 14px 18px;
+      display: flex;
+      gap: 5px;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      background: var(--text-soft);
+      border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+    .dot:nth-child(2) { animation-delay: .2s; }
+    .dot:nth-child(3) { animation-delay: .4s; }
+    @keyframes bounce {
+      0%,100%{ transform:translateY(0); opacity:.4; }
+      50%    { transform:translateY(-5px); opacity:1; }
+    }
+
+    /* Location card */
+    .loc-card {
+      background: var(--sun-light);
+      border: 1.5px solid #F5C667;
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    .loc-card-title { font-weight: 700; color: var(--soil); margin-bottom: 6px; font-size: 14px; }
+    .loc-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: var(--sun);
+      color: #fff;
+      border: none;
+      border-radius: 22px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: all .2s;
+      font-family: 'Mukta', sans-serif;
+    }
+    .loc-btn:hover { background: #E08B00; transform: translateY(-1px); }
+
+    /* ─── Input Area ─── */
+    .input-area {
+      padding: 12px 16px 16px;
+      background: var(--white);
+      border-top: 1.5px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      background: var(--cloud);
+      border: 1.5px solid var(--border);
+      border-radius: 26px;
+      padding: 8px 8px 8px 16px;
+      transition: border-color .2s;
+    }
+    .input-row:focus-within { border-color: var(--leaf); }
+
+    .loc-icon-btn {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: var(--sun-light);
+      border: 1.5px solid #F5C667;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all .2s;
+      flex-shrink: 0;
+    }
+    .loc-icon-btn:hover { background: var(--sun); }
+    .loc-icon-btn.got-location { background: var(--sky); border-color: var(--leaf); }
+
+    #user-input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-size: 15px;
+      font-family: 'Mukta', sans-serif;
+      color: var(--text);
+      outline: none;
+      resize: none;
+      max-height: 100px;
+      line-height: 1.5;
+      align-self: center;
+    }
+    #user-input::placeholder { color: var(--text-soft); }
+
+    .send-btn {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--leaf), var(--earth));
+      border: none;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all .2s;
+    }
+    .send-btn:hover { transform: scale(1.08); box-shadow: 0 4px 12px var(--shadow); }
+    .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .input-hint {
+      font-size: 11px;
+      color: var(--text-soft);
+      text-align: center;
+      margin-top: 8px;
+    }
+    .input-hint a { color: var(--leaf); text-decoration: none; font-weight: 600; }
+
+    /* ─── Scrollbar ─── */
+    .chat-area::-webkit-scrollbar { width: 4px; }
+    .chat-area::-webkit-scrollbar-track { background: transparent; }
+    .chat-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ─── Weather Widget ─── */
+    .weather-widget {
+      background: linear-gradient(135deg, #1565C0, #1976D2);
+      border-radius: 14px;
+      padding: 16px;
+      color: #fff;
+      margin-top: 8px;
+    }
+    .weather-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .weather-stat {
+      background: rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+    .weather-stat-label { font-size: 11px; opacity: 0.7; }
+    .weather-stat-val { font-weight: 700; font-size: 16px; }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 600px) {
+      .header-title { font-size: 18px; }
+      .bubble { max-width: 88%; font-size: 13.5px; }
+      .qa-btn { font-size: 12px; padding: 6px 12px; }
+      header::after { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="logo-wrap">🌾</div>
+    <div class="header-text">
+      <div class="header-title">KrishiBot</div>
+      <div class="header-sub"><span class="status-dot"></span>Smart Farming Assistant · किसान मित्र</div>
+    </div>
+  </header>
+
+  <!-- Language Bar -->
+  <div class="lang-bar">
+    <span class="lang-label">Language:</span>
+    <button class="lang-btn active" data-lang="en" onclick="setLanguage('en', this)">🇬🇧 English</button>
+    <button class="lang-btn" data-lang="hi" onclick="setLanguage('hi', this)">🇮🇳 हिंदी</button>
+    <button class="lang-btn" data-lang="kn" onclick="setLanguage('kn', this)">🏳️ ಕನ್ನಡ</button>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="quick-actions">
+    <button class="qa-btn" onclick="sendQuick('🌦️ What is the weather today?')">🌦️ Weather</button>
+    <button class="qa-btn" onclick="sendQuick('Crop recommendation for Kharif season')">🌾 Crop Advice</button>
+    <button class="qa-btn" onclick="sendQuick('My crop has aphids. What should I do?')">🐛 Pest Help</button>
+    <button class="qa-btn" onclick="sendQuick('Fertilizer recommendation for rice')">🧪 Fertilizer</button>
+    <button class="qa-btn" onclick="sendQuick('Why are my crop leaves turning yellow?')">🍂 Yellow Leaves</button>
+    <button class="qa-btn" onclick="sendQuick('How to increase crop yield?')">📈 Increase Yield</button>
+    <button class="qa-btn" onclick="sendQuick('Tell me about PM-KISAN scheme')">🏛️ Govt Schemes</button>
+  </div>
+
+  <!-- Chat Area -->
+  <div class="chat-area" id="chat-area">
+    <!-- Welcome -->
+    <div class="welcome">
+      <div class="welcome-icon">🌱</div>
+      <h2>Namaste, Farmer! 🙏</h2>
+      <p>I'm <strong>KrishiBot</strong>, your smart farming assistant.<br>
+      Ask me about <strong>weather, crops, pests, fertilizers</strong>, or any farming question.<br>
+      <em>नमस्ते किसान भाई! मुझसे खेती के बारे में कुछ भी पूछें।</em></p>
+    </div>
+  </div>
+
+  <!-- Input Area -->
+  <div class="input-area">
+    <div class="input-row">
+      <button class="loc-icon-btn" id="loc-btn" onclick="getLocation()" title="Share location for weather">📍</button>
+      <textarea id="user-input"
+        placeholder="Ask me anything about farming... (e.g., 'Best crop for black soil')"
+        rows="1"
+        onkeydown="handleKey(event)"
+        oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="send-btn" onclick="sendMessage()">➤</button>
+    </div>
+    <div class="input-hint">
+      📞 Kisan Helpline: <a href="tel:1800-180-1551">1800-180-1551</a> (Free · 24x7) &nbsp;|&nbsp;
+      Powered by <strong>KrishiBot AI</strong>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ────────────────────────────────────────────
+// State
+// ────────────────────────────────────────────
+// ⚠️  After deploying backend to Render, replace the URL below
+// with your actual Render URL e.g. https://krishibot-api.onrender.com
+const RENDER_BACKEND = 'https://YOUR-APP-NAME.onrender.com';
+
+const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:5000'
+  : RENDER_BACKEND;
+
+let currentLang = 'en';
+let userLocation = null;
+let context = { history: [] };
+let isLoading = false;
+
+// ────────────────────────────────────────────
+// Language
+// ────────────────────────────────────────────
+const UI_TEXT = {
+  en: { placeholder: "Ask me anything about farming...", thinking: "KrishiBot is thinking..." },
+  hi: { placeholder: "खेती के बारे में कुछ भी पूछें...", thinking: "KrishiBot सोच रहा है..." },
+  kn: { placeholder: "ಕೃಷಿಯ ಬಗ್ಗೆ ಏನಾದರೂ ಕೇಳಿ...", thinking: "KrishiBot ಯೋಚಿಸುತ್ತಿದೆ..." },
+};
+
+function setLanguage(lang, btn) {
+  currentLang = lang;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const t = UI_TEXT[lang] || UI_TEXT.en;
+  document.getElementById('user-input').placeholder = t.placeholder;
+}
+
+// ────────────────────────────────────────────
+// Location
+// ────────────────────────────────────────────
+function getLocation() {
+  if (!navigator.geolocation) {
+    addBotMessage("⚠️ Geolocation is not supported by your browser. Please enter your city name instead.", 'ai');
+    return;
+  }
+  const btn = document.getElementById('loc-btn');
+  btn.textContent = '⏳';
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      userLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      btn.textContent = '✅';
+      btn.classList.add('got-location');
+      btn.title = `Location: ${userLocation.lat.toFixed(3)}, ${userLocation.lon.toFixed(3)}`;
+      addBotMessage("📍 Location received! Now ask me about the **weather** for real-time farming advice.", 'weather');
+    },
+    (err) => {
+      btn.textContent = '📍';
+      addBotMessage("❌ Could not access location. Please allow location access in your browser, or type your city name.", 'ai');
+    }
+  );
+}
+
+// ────────────────────────────────────────────
+// Messaging
+// ────────────────────────────────────────────
+function sendQuick(text) {
+  document.getElementById('user-input').value = text;
+  sendMessage();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+async function sendMessage() {
+  if (isLoading) return;
+  const input = document.getElementById('user-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  // Add user bubble
+  addUserMessage(text);
+  input.value = '';
+  input.style.height = 'auto';
+
+  // Show typing indicator
+  const typingId = showTyping();
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+
+  try {
+    const payload = {
+      message: text,
+      language: currentLang,
+      context: context,
+    };
+    if (userLocation) {
+      payload.lat = userLocation.lat;
+      payload.lon = userLocation.lon;
+    }
+
+    const resp = await fetch(`${API_BASE}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    removeTyping(typingId);
+
+    if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
+    const data = await resp.json();
+
+    // Update context history
+    context.history = context.history || [];
+    context.history.push({ role: 'user', content: text });
+    context.history.push({ role: 'assistant', content: data.message });
+    if (context.history.length > 10) context.history = context.history.slice(-10);
+
+    // If context_update from module
+    if (data.context_update) Object.assign(context, data.context_update);
+
+    addBotMessage(data.message, data.module || 'ai', data);
+
+    // Special: if weather returned data, show widget
+    if (data.module === 'weather' && data.data && !data.data.error) {
+      addWeatherWidget(data.data);
+    }
+
+    // If needs location
+    if (data.status === 'needs_location') {
+      addLocationCard();
+    }
+
+  } catch (err) {
+    removeTyping(typingId);
+    addBotMessage(
+      "⚠️ Could not connect to KrishiBot server.\n\n" +
+      "**To start the backend:**\n" +
+      "```\ncd backend\npython app.py\n```\n\n" +
+      "Make sure Flask is running on port 5000.",
+      'error'
+    );
+  } finally {
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+  }
+}
+
+// ────────────────────────────────────────────
+// DOM Helpers
+// ────────────────────────────────────────────
+const MODULE_BADGES = {
+  weather:    { icon: '🌦️', label: 'Weather', cls: 'badge-weather' },
+  crop:       { icon: '🌾', label: 'Crop Advisor', cls: 'badge-crop' },
+  pest:       { icon: '🐛', label: 'Pest Advisor', cls: 'badge-pest' },
+  fertilizer: { icon: '🧪', label: 'Fertilizer', cls: 'badge-fertilizer' },
+  ai:         { icon: '🤖', label: 'AI Assistant', cls: 'badge-ai' },
+  error:      { icon: '⚠️', label: 'System', cls: 'badge-ai' },
+};
+
+function addUserMessage(text) {
+  const row = document.createElement('div');
+  row.className = 'msg-row user';
+  row.innerHTML = `
+    <div class="avatar user-avatar">👨‍🌾</div>
+    <div class="bubble user-bubble">${escapeHtml(text)}</div>
+  `;
+  append(row);
+}
+
+function addBotMessage(text, module = 'ai', data = null) {
+  const badge = MODULE_BADGES[module] || MODULE_BADGES.ai;
+  const row = document.createElement('div');
+  row.className = 'msg-row bot';
+  row.innerHTML = `
+    <div class="avatar bot-avatar">🌱</div>
+    <div class="bubble bot-bubble">
+      <div class="module-badge ${badge.cls}">${badge.icon} ${badge.label}</div>
+      <div>${renderMarkdown(text)}</div>
+    </div>
+  `;
+  append(row);
+}
+
+function addWeatherWidget(w) {
+  const row = document.createElement('div');
+  row.className = 'msg-row bot';
+  const demo = w._demo_mode ? '<div style="font-size:11px;opacity:.7;margin-top:8px;">⚠️ Demo mode — set OPENWEATHER_API_KEY for real data</div>' : '';
+  row.innerHTML = `
+    <div class="avatar bot-avatar">🌱</div>
+    <div class="bubble bot-bubble" style="padding:0;overflow:hidden;border:none;background:transparent;box-shadow:none;">
+      <div class="weather-widget">
+        <div style="font-size:20px;font-weight:700;">🌤️ ${w.location || 'Your Area'}</div>
+        <div style="font-size:13px;opacity:.8;margin-top:2px;">${(w.description||'').replace(/\b\w/g,c=>c.toUpperCase())}</div>
+        <div class="weather-grid">
+          <div class="weather-stat">
+            <div class="weather-stat-label">🌡️ Temperature</div>
+            <div class="weather-stat-val">${w.temp}°C</div>
+          </div>
+          <div class="weather-stat">
+            <div class="weather-stat-label">💧 Humidity</div>
+            <div class="weather-stat-val">${w.humidity}%</div>
+          </div>
+          <div class="weather-stat">
+            <div class="weather-stat-label">🌧️ Rain Chance</div>
+            <div class="weather-stat-val">${w.rain_chance}%</div>
+          </div>
+          <div class="weather-stat">
+            <div class="weather-stat-label">💨 Wind</div>
+            <div class="weather-stat-val">${w.wind_speed} m/s</div>
+          </div>
+        </div>
+        ${demo}
+      </div>
+    </div>
+  `;
+  append(row);
+}
+
+function addLocationCard() {
+  const row = document.createElement('div');
+  row.className = 'msg-row bot';
+  row.innerHTML = `
+    <div class="avatar bot-avatar">🌱</div>
+    <div class="bubble bot-bubble">
+      <div class="loc-card">
+        <div class="loc-card-title">📍 Share Your Location</div>
+        <div>Click the button below to share your location for accurate weather data and farming advice.</div>
+        <button class="loc-btn" onclick="getLocation()">📍 Share My Location</button>
+      </div>
+    </div>
+  `;
+  append(row);
+}
+
+function showTyping() {
+  const id = 'typing-' + Date.now();
+  const row = document.createElement('div');
+  row.className = 'typing-row';
+  row.id = id;
+  row.innerHTML = `
+    <div class="avatar bot-avatar">🌱</div>
+    <div class="typing-bubble">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+  `;
+  append(row);
+  return id;
+}
+
+function removeTyping(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function append(el) {
+  const area = document.getElementById('chat-area');
+  area.appendChild(el);
+  area.scrollTop = area.scrollHeight;
+}
+
+// ────────────────────────────────────────────
+// Text Processing
+// ────────────────────────────────────────────
+function escapeHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderMarkdown(text) {
+  let html = escapeHtml(text);
+  // Bold **text**
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Italic _text_
+  html = html.replace(/_(.+?)_/g, '<em>$1</em>');
+  // Inline code `text`
+  html = html.replace(/`([^`]+)`/g, '<code style="background:#f0f4e8;padding:2px 6px;border-radius:4px;font-size:12px;font-family:monospace;">$1</code>');
+  // Code block ```
+  html = html.replace(/```[\s\S]*?```/g, m => {
+    const code = m.replace(/```\w*\n?/g,'').replace(/```/g,'');
+    return `<pre style="background:#1e2d12;color:#b8e994;padding:12px;border-radius:8px;font-size:12px;overflow-x:auto;margin:6px 0;">${code}</pre>`;
+  });
+  // Newlines
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+// ────────────────────────────────────────────
+// Init: send a greeting on load
+// ────────────────────────────────────────────
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    addBotMessage(
+      "**Namaste! 🙏 Welcome to KrishiBot!**\n\n" +
+      "I can help you with:\n" +
+      "🌦️ **Weather** — Click 📍 to share location\n" +
+      "🌾 **Crop Advice** — Tell me your soil type & season\n" +
+      "🐛 **Pest & Disease** — Describe what you see\n" +
+      "🧪 **Fertilizer** — Tell me your crop name\n" +
+      "💬 **Any farming question** — just ask!\n\n" +
+      "_नमस्ते किसान भाई! मुझसे खेती के बारे में कुछ भी पूछें।_ 🌱",
+      'ai'
+    );
+  }, 400);
+});
+</script>
+</body>
+</html>
