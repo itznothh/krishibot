@@ -56,6 +56,10 @@ def _call_groq_api(message: str, context: dict) -> str:
             timeout=15
         )
         data = response.json()
-        return data["choices"][0]["message"]["content"]
+        if "choices" in data:
+    return data["choices"][0]["message"]["content"]
+else:
+    error_msg = data.get("error", {}).get("message", str(data))
+    return f"⚠️ AI Error: {error_msg}"
     except Exception as e:
         return f"Sorry, could not process your question. Please try again. Error: {str(e)}"
