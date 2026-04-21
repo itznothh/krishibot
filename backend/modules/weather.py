@@ -5,7 +5,7 @@ OPENWEATHER_KEY = os.environ.get("OPENWEATHER_API_KEY", "")
 
 def get_weather(lat: float, lon: float) -> dict:
     if not OPENWEATHER_KEY:
-        return {"error": "Weather API key not configured."}
+        return {"error": "Weather API key not configured. Please set OPENWEATHER_API_KEY."}
     
     try:
         url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={OPENWEATHER_KEY}&units=metric"
@@ -16,7 +16,7 @@ def get_weather(lat: float, lon: float) -> dict:
             return {"error": f"Weather fetch failed: {data.get('message', 'Unknown error')}"}
 
         weather = {
-            "temperature": data["main"]["temp"],
+            "temperature": round(data["main"]["temp"], 1),
             "humidity": data["main"]["humidity"],
             "condition": data["weather"][0]["description"].capitalize(),
             "wind_speed": data["wind"]["speed"],
@@ -25,6 +25,8 @@ def get_weather(lat: float, lon: float) -> dict:
         }
         return weather
 
+    except requests.exceptions.Timeout:
+        return {"error": "Weather request timed out. Please try again."}
     except Exception as e:
         return {"error": f"Could not fetch weather: {str(e)}"}
 
@@ -41,6 +43,10 @@ def _get_farming_advice(data: dict) -> str:
         advice.append("☀️ Hot and dry — irrigate crops early morning or evening.")
     elif "cloud" in condition:
         advice.append("⛅ Cloudy conditions — good time for spraying pesticides.")
+    elif "thunderstorm" in condition:
+        advice.append("⛈️ Thunderstorm alert — protect crops and avoid field work.")
+    elif "snow" in condition:
+        advice.append("❄️ Snow — protect sensitive crops from frost damage.")
 
     if humidity > 80:
         advice.append("💧 High humidity — watch for fungal diseases like blight.")

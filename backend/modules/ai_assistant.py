@@ -5,13 +5,15 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 SYSTEM_PROMPT = """You are KrishiBot, an expert farming assistant for Indian farmers.
 Answer ANY farming related question clearly and practically.
-Topics: crops, soil, pests, fertilizers, weather, government schemes, market prices, irrigation, organic farming.
+Topics: crops, soil, pests, fertilizers, weather, government schemes, market prices, irrigation, organic farming, animal husbandry.
 Rules:
 - Answer in the SAME language the farmer uses (Hindi, Kannada, English)
 - Keep answers practical and simple
 - Use bullet points for steps
 - Give specific quantities and measurements
-- Never say you cannot answer a farming question"""
+- Be encouraging and supportive
+- Never say you cannot answer a farming question
+- For non-farming questions, politely redirect to farming topics"""
 
 def get_ai_response(message: str, context: dict) -> str:
     if not GROQ_API_KEY:
@@ -38,7 +40,7 @@ def _call_groq_api(message: str, context: dict) -> str:
                 "max_tokens": 500,
                 "temperature": 0.7
             },
-            timeout=15
+            timeout=30
         )
         data = response.json()
         if "choices" in data:
@@ -47,4 +49,4 @@ def _call_groq_api(message: str, context: dict) -> str:
             error_msg = data.get("error", {}).get("message", str(data))
             return f"AI Error: {error_msg}"
     except Exception as e:
-        return f"Sorry, could not process your question. Error: {str(e)}"
+        return f"Sorry, could not process your question. Please try again. Error: {str(e)}"

@@ -1,198 +1,120 @@
 """
 KrishiBot - Crop Recommendation Module
-Rule-based crop recommender (designed for easy ML upgrade).
+Rule-based crop recommendation based on soil type and season.
 """
 
-import re
-
-# ──────────────────────────────────────────────
-# Knowledge Base
-# ──────────────────────────────────────────────
-CROP_DATABASE = {
-    # Format: (season, soil_type) -> list of crops
-    ("kharif", "loamy"):   ["Rice", "Maize", "Soybean", "Cotton", "Groundnut"],
-    ("kharif", "black"):   ["Cotton", "Soybean", "Jowar", "Sugarcane", "Groundnut"],
-    ("kharif", "sandy"):   ["Groundnut", "Bajra", "Moong", "Sesame"],
-    ("kharif", "red"):     ["Groundnut", "Cotton", "Jowar", "Ragi"],
-    ("kharif", "clayey"):  ["Rice", "Jute", "Sugarcane"],
-    ("rabi", "loamy"):     ["Wheat", "Mustard", "Gram", "Peas", "Lentils"],
-    ("rabi", "black"):     ["Wheat", "Chickpea", "Safflower", "Gram"],
-    ("rabi", "sandy"):     ["Mustard", "Gram", "Barley"],
-    ("rabi", "red"):       ["Wheat", "Gram", "Linseed"],
-    ("rabi", "clayey"):    ["Wheat", "Mustard", "Gram"],
-    ("zaid", "loamy"):     ["Watermelon", "Muskmelon", "Cucumber", "Bitter Gourd"],
-    ("zaid", "sandy"):     ["Watermelon", "Muskmelon", "Moong"],
-    ("zaid", "black"):     ["Moong", "Urad", "Sesame"],
-    ("zaid", "red"):       ["Moong", "Watermelon", "Vegetables"],
-    ("zaid", "clayey"):    ["Vegetables", "Cucumber", "Muskmelon"],
-}
-
-CROP_DETAILS = {
-    "Rice":        {"water": "High", "duration": "120-150 days", "npk": "120-60-60 kg/ha"},
-    "Wheat":       {"water": "Medium", "duration": "110-130 days", "npk": "120-60-40 kg/ha"},
-    "Maize":       {"water": "Medium", "duration": "90-120 days", "npk": "120-60-40 kg/ha"},
-    "Cotton":      {"water": "Medium", "duration": "160-200 days", "npk": "80-40-40 kg/ha"},
-    "Soybean":     {"water": "Medium", "duration": "90-110 days", "npk": "30-80-40 kg/ha"},
-    "Groundnut":   {"water": "Low-Medium", "duration": "100-130 days", "npk": "25-50-75 kg/ha"},
-    "Mustard":     {"water": "Low", "duration": "90-110 days", "npk": "80-40-40 kg/ha"},
-    "Gram":        {"water": "Low", "duration": "90-110 days", "npk": "20-50-40 kg/ha"},
-    "Sugarcane":   {"water": "Very High", "duration": "300-365 days", "npk": "250-115-115 kg/ha"},
-    "Watermelon":  {"water": "Low-Medium", "duration": "70-90 days", "npk": "60-40-60 kg/ha"},
-    "Jowar":       {"water": "Low", "duration": "100-120 days", "npk": "80-40-40 kg/ha"},
-    "Bajra":       {"water": "Low", "duration": "80-90 days", "npk": "80-40-40 kg/ha"},
-}
-
-SEASON_MONTHS = {
-    "kharif": "June – November (Monsoon season)",
-    "rabi":   "October – March (Winter season)",
-    "zaid":   "March – June (Summer/dry season)",
-}
-
-SOIL_DESCRIPTIONS = {
-    "loamy":  "Good water retention, rich in nutrients — ideal for most crops",
-    "black":  "High clay content, retains moisture well — great for cotton",
-    "sandy":  "Low water retention, good drainage — suited for drought crops",
-    "red":    "Well-drained, low fertility — requires more fertilizer",
-    "clayey": "Heavy soil, slow drainage — good for paddy and jute",
-}
-
-
-def recommend_crops(message: str, context: dict) -> dict:
-    """
-    Parse user message for soil type and season, then recommend crops.
-    Falls back to asking for details if insufficient info.
-    """
-    msg_lower = message.lower()
-
-    # Extract season
-    season = _extract_season(msg_lower)
-
-    # Extract soil type
-    soil = _extract_soil(msg_lower)
-
-    # Use context from previous messages if available
-    if not season:
-        season = context.get("season")
-    if not soil:
-        soil = context.get("soil")
-
-    # Generate recommendation
-    if season and soil:
-        return _build_recommendation(season, soil)
-    elif season:
-        return {
-            "message": (
-                f"I can help with {season.title()} crops! 🌱\n\n"
-                "What type of soil do you have?\n"
-                "• **Loamy** – soft, brown soil (most common)\n"
-                "• **Black** – dark cotton soil (regur)\n"
-                "• **Sandy** – light, grainy soil\n"
-                "• **Red** – reddish, iron-rich soil\n"
-                "• **Clayey** – heavy, sticky soil"
-            ),
-            "status": "needs_soil",
-            "context_update": {"season": season}
-        }
-    elif soil:
-        return {
-            "message": (
-                f"You have **{soil} soil** — {SOIL_DESCRIPTIONS.get(soil, '')} 🌍\n\n"
-                "Which season are you planning for?\n"
-                "• **Kharif** – June to November (monsoon)\n"
-                "• **Rabi** – October to March (winter)\n"
-                "• **Zaid** – March to June (summer)"
-            ),
-            "status": "needs_season",
-            "context_update": {"soil": soil}
-        }
-    else:
-        return {
-            "message": (
-                "I'll help you choose the best crops! 🌾\n\n"
-                "Please tell me:\n"
-                "1. **Season**: Kharif (monsoon), Rabi (winter), or Zaid (summer)?\n"
-                "2. **Soil type**: Loamy, Black, Sandy, Red, or Clayey?\n\n"
-                "_Example: \"Rabi season, loamy soil\"_"
-            ),
-            "status": "needs_info"
-        }
-
-
-def _build_recommendation(season: str, soil: str) -> dict:
-    key = (season, soil)
-    crops = CROP_DATABASE.get(key, [])
-
-    if not crops:
-        # Try closest match
-        for k, v in CROP_DATABASE.items():
-            if k[0] == season:
-                crops = v
-                soil = k[1]
-                break
-
-    if not crops:
-        return {
-            "message": f"I don't have data for {season} + {soil} combination. Please consult your local Krishi Vigyan Kendra.",
-            "crops": [],
-            "status": "not_found"
-        }
-
-    # Build rich response
-    lines = [
-        f"✅ **Best crops for {season.title()} season on {soil.title()} soil:**\n",
-        f"📅 Season window: {SEASON_MONTHS.get(season, '')}",
-        f"🌍 Soil: {soil.title()} — {SOIL_DESCRIPTIONS.get(soil, '')}\n",
-        "**Recommended Crops:**"
-    ]
-
-    for i, crop in enumerate(crops[:5], 1):
-        details = CROP_DETAILS.get(crop, {})
-        water = details.get("water", "Medium")
-        duration = details.get("duration", "~120 days")
-        lines.append(f"{i}. **{crop}** — 💧 Water: {water} | ⏱ Duration: {duration}")
-
-    lines.append("\n💡 _Tip: Contact your local agricultural officer for seed subsidies._")
-
-    return {
-        "message": "\n".join(lines),
-        "crops": crops,
-        "season": season,
-        "soil": soil,
-        "status": "success"
+CROP_DATA = {
+    "black": {
+        "kharif": ["Cotton 🌿", "Soybean", "Jowar", "Bajra", "Tur (Pigeon Pea)"],
+        "rabi": ["Wheat", "Chickpea (Chana)", "Linseed", "Safflower"],
+        "zaid": ["Watermelon", "Muskmelon", "Cucumber", "Moong Dal"]
+    },
+    "loamy": {
+        "kharif": ["Rice", "Maize", "Groundnut", "Sugarcane", "Cotton"],
+        "rabi": ["Wheat", "Mustard", "Peas", "Lentil (Masoor)", "Barley"],
+        "zaid": ["Vegetables", "Sunflower", "Moong", "Watermelon"]
+    },
+    "sandy": {
+        "kharif": ["Bajra", "Groundnut", "Sesame (Til)", "Moth Bean", "Cluster Bean"],
+        "rabi": ["Mustard", "Barley", "Chickpea", "Wheat (with irrigation)"],
+        "zaid": ["Watermelon", "Cucumber", "Moong Dal"]
+    },
+    "clay": {
+        "kharif": ["Rice", "Jute", "Sugarcane", "Maize"],
+        "rabi": ["Wheat", "Mustard", "Chickpea", "Berseem"],
+        "zaid": ["Vegetables", "Moong", "Urad"]
+    },
+    "red": {
+        "kharif": ["Groundnut", "Maize", "Rice", "Ragi", "Bajra"],
+        "rabi": ["Wheat", "Chickpea", "Mustard", "Lentil"],
+        "zaid": ["Moong", "Watermelon", "Vegetables"]
     }
+}
 
+SEASON_KEYWORDS = {
+    "kharif": ["kharif", "monsoon", "june", "july", "august", "september", "rainy"],
+    "rabi": ["rabi", "winter", "october", "november", "december", "january", "february"],
+    "zaid": ["zaid", "summer", "march", "april", "may", "zaid", "grishma"]
+}
 
-def _extract_season(text: str) -> str | None:
-    if any(w in text for w in ["kharif", "monsoon", "june", "july", "august"]):
-        return "kharif"
-    if any(w in text for w in ["rabi", "winter", "november", "december", "january"]):
-        return "rabi"
-    if any(w in text for w in ["zaid", "summer", "march", "april", "may"]):
-        return "zaid"
-    return None
+SOIL_KEYWORDS = {
+    "black": ["black", "cotton soil", "regur", "काली मिट्टी"],
+    "loamy": ["loamy", "loam", "दोमट"],
+    "sandy": ["sandy", "sand", "बलुई"],
+    "clay": ["clay", "clayey", "चिकनी मिट्टी"],
+    "red": ["red", "laterite", "लाल मिट्टी"]
+}
 
+def recommend_crops(message: str, context: dict) -> str:
+    msg_lower = message.lower()
+    
+    detected_soil = None
+    detected_season = None
 
-def _extract_soil(text: str) -> str | None:
-    if any(w in text for w in ["loamy", "loam"]):
-        return "loamy"
-    if any(w in text for w in ["black", "cotton soil", "regur"]):
-        return "black"
-    if any(w in text for w in ["sandy", "sand"]):
-        return "sandy"
-    if any(w in text for w in ["red soil", "red"]):
-        return "red"
-    if any(w in text for w in ["clayey", "clay"]):
-        return "clayey"
-    return None
+    for soil, keywords in SOIL_KEYWORDS.items():
+        if any(k in msg_lower for k in keywords):
+            detected_soil = soil
+            break
 
+    for season, keywords in SEASON_KEYWORDS.items():
+        if any(k in msg_lower for k in keywords):
+            detected_season = season
+            break
 
-# ──────────────────────────────────────────────
-# Future ML Hook (placeholder)
-# ──────────────────────────────────────────────
-def recommend_crops_ml(soil: str, season: str, location: dict, rainfall: float) -> list:
-    """
-    Future: Replace rule-based logic with ML model.
-    Could use RandomForest or a trained neural network
-    trained on soil-crop-yield datasets.
-    """
-    raise NotImplementedError("ML model not yet integrated")
+    # Check context for previously mentioned soil/season
+    if not detected_soil and context.get("soil"):
+        detected_soil = context.get("soil")
+    if not detected_season and context.get("season"):
+        detected_season = context.get("season")
+
+    if detected_soil and detected_season:
+        crops = CROP_DATA.get(detected_soil, {}).get(detected_season, [])
+        if crops:
+            crop_list = "\n".join([f"  • {crop}" for crop in crops])
+            return (
+                f"🌾 **Recommended Crops for {detected_soil.capitalize()} Soil — {detected_season.capitalize()} Season:**\n\n"
+                f"{crop_list}\n\n"
+                f"💡 **Tips:**\n"
+                f"  • Use certified seeds for better yield\n"
+                f"  • Do a soil test before sowing\n"
+                f"  • Follow local KVK (Krishi Vigyan Kendra) recommendations\n\n"
+                f"📞 Kisan Call Center: **1800-180-1551** (Free, 24x7)"
+            )
+
+    elif detected_soil:
+        return (
+            f"You have **{detected_soil} soil** — {_soil_description(detected_soil)}\n\n"
+            f"Which season are you planning for?"
+            f"  • **Kharif** – June to November (monsoon)\n"
+            f"  • **Rabi** – October to March (winter)\n"
+            f"  • **Zaid** – March to June (summer)"
+        )
+
+    elif detected_season:
+        return (
+            f"For **{detected_season.capitalize()} season**, what is your soil type?\n\n"
+            f"  • **Black soil** – good for cotton\n"
+            f"  • **Loamy soil** – good for wheat, rice\n"
+            f"  • **Sandy soil** – good for bajra, groundnut\n"
+            f"  • **Clay soil** – good for rice, sugarcane\n"
+            f"  • **Red soil** – good for groundnut, ragi"
+        )
+
+    else:
+        return (
+            f"🌱 I can suggest the best crops for your farm!\n\n"
+            f"Please tell me:\n"
+            f"1. **Soil type** — black, loamy, sandy, clay, or red?\n"
+            f"2. **Season** — Kharif (monsoon), Rabi (winter), or Zaid (summer)?\n\n"
+            f"Example: *'I have black soil, kharif season'*"
+        )
+
+def _soil_description(soil: str) -> str:
+    descriptions = {
+        "black": "High clay content, retains moisture well — great for cotton 🌍",
+        "loamy": "Best soil type, well-drained and fertile — good for most crops 🌟",
+        "sandy": "Well-drained but low nutrients — best for drought-resistant crops 🏜️",
+        "clay": "Heavy soil, retains water — good for rice and sugarcane 💧",
+        "red": "Low in nitrogen, good drainage — good for groundnut and millets 🔴"
+    }
+    return descriptions.get(soil, "suitable for many crops")

@@ -1,212 +1,133 @@
 """
 KrishiBot - Fertilizer Recommendation Module
-Recommends fertilizers based on crop type and soil conditions.
-Covers both chemical (NPK) and organic options.
 """
 
-# ──────────────────────────────────────────────
-# Fertilizer Knowledge Base
-# ──────────────────────────────────────────────
-FERTILIZER_DATABASE = {
+FERTILIZER_DATA = {
     "rice": {
-        "npk": {"N": 120, "P": 60, "K": 60},
+        "npk": "N:120 | P:60 | K:60 kg/hectare",
         "chemical": [
-            {"name": "Urea (46% N)", "dose": "2.6 bags/acre", "timing": "Split: 50% at sowing, 25% at tillering, 25% at panicle initiation"},
-            {"name": "DAP (18-46-0)", "dose": "1.5 bags/acre", "timing": "At sowing/transplanting"},
-            {"name": "MOP (0-0-60)", "dose": "1 bag/acre", "timing": "Basal application"}
+            {"name": "Urea", "amount": "2.6 bags/acre", "when": "Split: 50% basal, 25% tillering, 25% panicle"},
+            {"name": "DAP", "amount": "1.3 bags/acre", "when": "Basal application"},
+            {"name": "MOP", "amount": "1 bag/acre", "when": "Basal application"}
         ],
         "organic": [
-            {"name": "FYM (Farmyard Manure)", "dose": "5–8 tonnes/acre", "timing": "2–3 weeks before transplanting"},
-            {"name": "Green Manure (Dhaincha)", "dose": "Grow and incorporate before rice", "timing": "45 days before transplanting"},
-            {"name": "Azolla (biofertilizer)", "dose": "500 kg/acre", "timing": "Apply in field 7 days after transplanting"},
+            {"name": "FYM (Farm Yard Manure)", "amount": "5 tonnes/acre", "when": "2-3 weeks before transplanting"},
+            {"name": "Green Manure (Dhaincha)", "amount": "Plough in at flowering", "when": "Before transplanting"},
+            {"name": "Azolla", "amount": "500 kg/acre", "when": "10-15 days after transplanting"}
         ],
-        "tip": "Split urea application significantly improves nitrogen use efficiency in paddy."
+        "tip": "Apply zinc sulfate 25kg/ha if zinc deficiency is seen (yellowing between leaf veins)."
     },
     "wheat": {
-        "npk": {"N": 120, "P": 60, "K": 40},
+        "npk": "N:120 | P:60 | K:40 kg/hectare",
         "chemical": [
-            {"name": "Urea (46% N)", "dose": "2.6 bags/acre", "timing": "50% basal, 50% at first irrigation (CRI stage)"},
-            {"name": "SSP (0-16-0)", "dose": "3 bags/acre", "timing": "Basal application"},
-            {"name": "MOP (0-0-60)", "dose": "0.7 bag/acre", "timing": "Basal"}
+            {"name": "Urea", "amount": "2.6 bags/acre", "when": "50% basal + 50% at first irrigation (CRI stage)"},
+            {"name": "DAP", "amount": "1.3 bags/acre", "when": "Basal application"},
+            {"name": "MOP", "amount": "0.7 bags/acre", "when": "Basal application"}
         ],
         "organic": [
-            {"name": "Vermicompost", "dose": "2–3 tonnes/acre", "timing": "Before sowing"},
-            {"name": "FYM", "dose": "4–5 tonnes/acre", "timing": "3–4 weeks before sowing"},
+            {"name": "FYM", "amount": "4-5 tonnes/acre", "when": "3-4 weeks before sowing"},
+            {"name": "Vermicompost", "amount": "2 tonnes/acre", "when": "At sowing"},
+            {"name": "Bio-fertilizer (Azotobacter)", "amount": "Seed treatment", "when": "Before sowing"}
         ],
-        "tip": "Use zinc sulfate (25 kg/ha) if soil is zinc-deficient — very common in wheat-growing areas."
+        "tip": "Apply sulfur 20kg/ha for better protein content in grain."
     },
     "cotton": {
-        "npk": {"N": 80, "P": 40, "K": 40},
+        "npk": "N:80 | P:40 | K:40 kg/hectare",
         "chemical": [
-            {"name": "Urea", "dose": "1.75 bags/acre", "timing": "30 days, 60 days, 90 days after sowing (3 splits)"},
-            {"name": "DAP", "dose": "1 bag/acre", "timing": "Basal"},
-            {"name": "MOP", "dose": "0.7 bag/acre", "timing": "Basal"}
+            {"name": "Urea", "amount": "1.75 bags/acre", "when": "30 days, 60 days, 90 days after sowing (3 splits)"},
+            {"name": "DAP", "amount": "1 bag/acre", "when": "Basal"},
+            {"name": "MOP", "amount": "0.7 bag/acre", "when": "Basal"}
         ],
         "organic": [
-            {"name": "FYM", "dose": "5 tonnes/acre", "timing": "2 weeks before sowing"},
-            {"name": "Neem Cake", "dose": "100 kg/acre", "timing": "Mix in soil at sowing"},
+            {"name": "FYM", "amount": "5 tonnes/acre", "when": "2 weeks before sowing"},
+            {"name": "Neem Cake", "amount": "100 kg/acre", "when": "Mix in soil at sowing"},
+            {"name": "Jeevamrit", "amount": "200 liters/acre", "when": "After each irrigation"}
         ],
         "tip": "Boron spray (0.1%) at flowering improves boll setting in cotton."
     },
     "maize": {
-        "npk": {"N": 120, "P": 60, "K": 40},
+        "npk": "N:120 | P:60 | K:40 kg/hectare",
         "chemical": [
-            {"name": "Urea", "dose": "2.6 bags/acre", "timing": "1/3 basal, 1/3 knee-high, 1/3 tasseling"},
-            {"name": "DAP", "dose": "1.5 bags/acre", "timing": "Basal"},
-            {"name": "MOP", "dose": "0.7 bag/acre", "timing": "Basal"}
+            {"name": "Urea", "amount": "2.6 bags/acre", "when": "1/3 basal, 1/3 at knee height, 1/3 at tasseling"},
+            {"name": "DAP", "amount": "1.3 bags/acre", "when": "Basal"},
+            {"name": "MOP", "amount": "0.7 bags/acre", "when": "Basal"}
         ],
         "organic": [
-            {"name": "Poultry Manure", "dose": "2 tonnes/acre", "timing": "Before sowing"},
-            {"name": "FYM", "dose": "4 tonnes/acre", "timing": "2–3 weeks before sowing"}
+            {"name": "FYM", "amount": "4 tonnes/acre", "when": "Before sowing"},
+            {"name": "Vermicompost", "amount": "1.5 tonnes/acre", "when": "At sowing"},
+            {"name": "PSB (Phosphate Solubilizing Bacteria)", "amount": "Seed treatment", "when": "Before sowing"}
         ],
-        "tip": "Zinc deficiency is common in maize. Apply zinc sulfate 25 kg/ha."
+        "tip": "Zinc deficiency is common in maize — apply zinc sulfate 25kg/ha if needed."
     },
     "tomato": {
-        "npk": {"N": 100, "P": 60, "K": 80},
+        "npk": "N:120 | P:80 | K:80 kg/hectare",
         "chemical": [
-            {"name": "Urea", "dose": "2.2 bags/acre", "timing": "Split into 4–5 applications"},
-            {"name": "DAP", "dose": "1.5 bags/acre", "timing": "Basal"},
-            {"name": "MOP", "dose": "1.3 bags/acre", "timing": "Split: basal + fruit set"}
+            {"name": "Urea", "amount": "2.6 bags/acre", "when": "Split in 3-4 doses during crop growth"},
+            {"name": "DAP", "amount": "1.7 bags/acre", "when": "Basal"},
+            {"name": "MOP", "amount": "1.3 bags/acre", "when": "Basal + at fruit development"}
         ],
         "organic": [
-            {"name": "Vermicompost", "dose": "1.5 tonnes/acre", "timing": "Before transplanting"},
-            {"name": "Compost Tea", "dose": "Spray every 15 days", "timing": "During growth"},
-            {"name": "Bone Meal", "dose": "100 kg/acre", "timing": "Basal — improves root and fruit development"}
+            {"name": "FYM/Compost", "amount": "6 tonnes/acre", "when": "Before transplanting"},
+            {"name": "Vermicompost", "amount": "2 tonnes/acre", "when": "At transplanting"},
+            {"name": "Calcium spray", "amount": "0.5% solution", "when": "At fruiting to prevent blossom end rot"}
         ],
-        "tip": "Calcium spray (calcium nitrate 1%) prevents blossom end rot in tomatoes."
-    },
-    "sugarcane": {
-        "npk": {"N": 250, "P": 115, "K": 115},
-        "chemical": [
-            {"name": "Urea", "dose": "5.5 bags/acre", "timing": "Split into 3: at planting, 90 days, 180 days"},
-            {"name": "DAP", "dose": "2.5 bags/acre", "timing": "At planting"},
-            {"name": "MOP", "dose": "2 bags/acre", "timing": "Split: planting + 90 days"}
-        ],
-        "organic": [
-            {"name": "Pressmud (sugarcane byproduct)", "dose": "5 tonnes/acre", "timing": "Before planting"},
-            {"name": "FYM", "dose": "8 tonnes/acre", "timing": "1 month before planting"},
-        ],
-        "tip": "Sugarcane is a heavy feeder. Never skip potassium — it improves sucrose content."
+        "tip": "Calcium and boron are critical for tomato fruit quality — don't skip micronutrients."
     },
     "groundnut": {
-        "npk": {"N": 25, "P": 50, "K": 75},
+        "npk": "N:20 | P:40 | K:40 kg/hectare",
         "chemical": [
-            {"name": "DAP", "dose": "1.25 bags/acre", "timing": "Basal"},
-            {"name": "MOP", "dose": "1.25 bags/acre", "timing": "Basal"},
-            {"name": "Gypsum", "dose": "100 kg/acre", "timing": "At pegging stage — essential for calcium"}
+            {"name": "DAP", "amount": "0.9 bags/acre", "when": "Basal application"},
+            {"name": "MOP", "amount": "0.7 bags/acre", "when": "Basal application"},
+            {"name": "Gypsum", "amount": "100 kg/acre", "when": "At pegging stage — critical for pod development"}
         ],
         "organic": [
-            {"name": "Rhizobium biofertilizer", "dose": "Seed treatment before sowing", "timing": "At sowing"},
-            {"name": "FYM", "dose": "3 tonnes/acre", "timing": "Before sowing"},
+            {"name": "FYM", "amount": "4 tonnes/acre", "when": "Before sowing"},
+            {"name": "Rhizobium inoculant", "amount": "Seed treatment", "when": "Before sowing — fixes nitrogen naturally"},
+            {"name": "Neem Cake", "amount": "100 kg/acre", "when": "At sowing"}
         ],
-        "tip": "Groundnut fixes its own nitrogen (legume). Apply Rhizobium for best results."
+        "tip": "Groundnut fixes its own nitrogen — avoid heavy urea. Gypsum is essential for good pod filling."
+    },
+    "sugarcane": {
+        "npk": "N:250 | P:80 | K:100 kg/hectare",
+        "chemical": [
+            {"name": "Urea", "amount": "5.4 bags/acre", "when": "Split in 4 doses over the season"},
+            {"name": "DAP", "amount": "1.7 bags/acre", "when": "Basal"},
+            {"name": "MOP", "amount": "1.7 bags/acre", "when": "Basal + 3 months"}
+        ],
+        "organic": [
+            {"name": "Pressmud", "amount": "5 tonnes/acre", "when": "Before planting"},
+            {"name": "FYM", "amount": "8 tonnes/acre", "when": "Before planting"},
+            {"name": "Trash mulching", "amount": "Cover field with dry leaves", "when": "After 3rd month — conserves moisture"}
+        ],
+        "tip": "Sugarcane responds well to ratoon management — proper fertilization in ratoon crop improves yield significantly."
     }
 }
 
-# Soil-based correction factors
-SOIL_ADJUSTMENTS = {
-    "black": "Black soils are naturally high in potassium. You may reduce K application by 25%.",
-    "sandy": "Sandy soils have low water/nutrient retention. Use split fertilizer applications and prefer slow-release fertilizers.",
-    "red": "Red soils are often deficient in nitrogen and phosphorus. Increase N and P doses by 20%.",
-    "clayey": "Clayey soils have good nutrient holding capacity. Standard doses apply, but ensure good drainage.",
-    "loamy": "Loamy soil is ideal. Standard fertilizer doses should work well for most crops."
-}
-
-
-def get_fertilizer_advice(message: str, context: dict) -> dict:
-    """
-    Parse message for crop and soil type, then return fertilizer recommendations.
-    """
+def get_fertilizer_advice(message: str) -> str:
     msg_lower = message.lower()
 
-    # Detect crop from message
-    crop = _extract_crop(msg_lower) or context.get("crop")
-    soil = _extract_soil(msg_lower) or context.get("soil")
+    for crop, data in FERTILIZER_DATA.items():
+        if crop in msg_lower:
+            chemical_list = "\n".join([
+                f"  • **{f['name']}** — {f['amount']}\n    _{f['when']}_"
+                for f in data["chemical"]
+            ])
+            organic_list = "\n".join([
+                f"  • **{f['name']}** — {f['amount']}\n    _{f['when']}_"
+                for f in data["organic"]
+            ])
+            return (
+                f"🧪 **Fertilizer Guide for {crop.capitalize()}**\n\n"
+                f"📊 **Required NPK:** {data['npk']}\n\n"
+                f"⚗️ **Chemical Fertilizers:**\n{chemical_list}\n\n"
+                f"🌿 **Organic Options (Eco-friendly):**\n{organic_list}\n\n"
+                f"💡 **Pro Tip:** {data['tip']}\n\n"
+                f"📞 For soil testing: Contact your nearest Krishi Vigyan Kendra (KVK)"
+            )
 
-    if crop and crop in FERTILIZER_DATABASE:
-        return _build_fertilizer_response(crop, soil)
-    elif crop:
-        return {
-            "message": (
-                f"I have general guidelines for **{crop.title()}**. "
-                f"For precise recommendations, a soil test is best.\n\n"
-                f"Standard NPK ratio for {crop.title()}: depends on soil. "
-                f"Please mention your soil type (black, red, sandy, loamy, clayey) for better advice."
-            ),
-            "status": "partial"
-        }
-    else:
-        return {
-            "message": (
-                "🌿 I can suggest fertilizers for your crops!\n\n"
-                "Which crop are you asking about?\n"
-                "• Rice, Wheat, Maize, Cotton\n"
-                "• Tomato, Groundnut, Sugarcane\n"
-                "• (More crops available — just ask!)\n\n"
-                "_Also mention your soil type for more accurate advice._\n"
-                "_Example: 'Fertilizer for wheat on black soil'_"
-            ),
-            "status": "needs_info"
-        }
-
-
-def _build_fertilizer_response(crop: str, soil: str | None) -> dict:
-    data = FERTILIZER_DATABASE[crop]
-    npk = data["npk"]
-    chemical = data["chemical"]
-    organic = data["organic"]
-    tip = data.get("tip", "")
-    soil_note = SOIL_ADJUSTMENTS.get(soil, "") if soil else ""
-
-    lines = [
-        f"🌾 **Fertilizer Guide for {crop.title()}**\n",
-        f"📊 **Required NPK:** N:{npk['N']} | P:{npk['P']} | K:{npk['K']} kg/hectare\n",
-        "⚗️ **Chemical Fertilizers:**"
-    ]
-    for f in chemical:
-        lines.append(f"  • **{f['name']}** — {f['dose']}")
-        lines.append(f"    📅 _When: {f['timing']}_")
-
-    lines.append("\n🌿 **Organic Options (Eco-friendly):**")
-    for f in organic:
-        lines.append(f"  • **{f['name']}** — {f['dose']}")
-        lines.append(f"    📅 _When: {f['timing']}_")
-
-    if soil_note:
-        lines.append(f"\n🌍 **Soil Note ({soil.title()} soil):** {soil_note}")
-
-    if tip:
-        lines.append(f"\n💡 **Pro Tip:** {tip}")
-
-    lines.append("\n📋 _Always do a soil test before applying fertilizers for best results._")
-
-    return {
-        "message": "\n".join(lines),
-        "crop": crop,
-        "npk": npk,
-        "recommendations": chemical + organic,
-        "status": "success"
-    }
-
-
-def _extract_crop(text: str) -> str | None:
-    crop_keywords = {
-        "rice": ["rice", "paddy", "dhaan"],
-        "wheat": ["wheat", "gehun"],
-        "cotton": ["cotton", "kapas"],
-        "maize": ["maize", "corn", "makka"],
-        "tomato": ["tomato", "tamatar"],
-        "sugarcane": ["sugarcane", "ganna"],
-        "groundnut": ["groundnut", "peanut", "moongfali"],
-    }
-    for crop, keywords in crop_keywords.items():
-        if any(kw in text for kw in keywords):
-            return crop
-    return None
-
-
-def _extract_soil(text: str) -> str | None:
-    for soil in ["black", "red", "sandy", "loamy", "clayey"]:
-        if soil in text:
-            return soil
-    return None
+    return (
+        f"🧪 I can suggest fertilizers for these crops:\n\n"
+        f"Rice 🌾 | Wheat 🌾 | Cotton 🌿 | Maize 🌽 | Tomato 🍅 | Groundnut | Sugarcane\n\n"
+        f"Please tell me your **crop name** and I'll give you complete fertilizer guidance!\n\n"
+        f"Example: *'fertilizer for wheat'* or *'ganhu ke liye khad'*"
+    )
