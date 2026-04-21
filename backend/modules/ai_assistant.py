@@ -33,7 +33,7 @@ def _call_groq_api(message: str, context: dict) -> str:
                 "Content-Type": "application/json"
             },
             json={
-                "model": "llama3-8b-8192",
+                "model": "llama-3.3-70b-versatile",
                 "messages": messages,
                 "max_tokens": 500,
                 "temperature": 0.7
