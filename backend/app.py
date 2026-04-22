@@ -114,15 +114,20 @@ def chat():
                 if "error" in weather_data:
                     return jsonify({"status": "error", "message": weather_data["error"]})
 
-                # Enrich rain-specific questions with AI commentary
+                # Always generate a farming advice summary for the weather card
                 msg_lower = message.lower()
                 if any(w in msg_lower for w in ['rain', 'barish', 'rainfall', 'chances', 'will it rain']):
-                    ai_msg = get_ai_response(
+                    prompt = (
                         f"Based on this weather data: {weather_data}, what are the rain chances? "
-                        "Give a short 2-3 line farmer-friendly answer.",
-                        context
+                        "Give a short 2-3 line farmer-friendly answer."
                     )
-                    weather_data["farming_advice"] = ai_msg
+                else:
+                    prompt = (
+                        f"Based on this weather data: {weather_data}, give a short 2-3 line "
+                        "farmer-friendly tip on how this weather affects farming today "
+                        "(e.g. irrigation, spraying, harvesting advice)."
+                    )
+                weather_data["farming_advice"] = get_ai_response(prompt, context)
 
                 return jsonify({"status": "weather", "data": weather_data})
             else:

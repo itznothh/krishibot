@@ -245,7 +245,7 @@ function addWeatherCard(data) {
           <div class="weather-detail">💧 Humidity: ${data.humidity}%</div>
           <div class="weather-detail">🌬️ Wind: ${data.wind_speed} m/s</div>
         </div>
-        <div class="weather-advice">${data.farming_advice}</div>
+        <div class="weather-advice">${data.farming_advice || '🌾 Check conditions before planning field activities today.'}</div>
       </div>
     </div>`;
   ca.appendChild(div);
