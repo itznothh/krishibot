@@ -347,7 +347,12 @@ async function sendMessage() {
     const payload = {
       message: text,
       language: currentLang,
-      context: context
+      context: {
+        ...context,
+        location_status: userLocation
+          ? `User's GPS location is available (lat=${userLocation.lat}, lon=${userLocation.lon}). Location was successfully shared.`
+          : "User has not shared GPS location yet. They can click the 📍 button."
+      }
     };
     if (userLocation) {
       payload.lat = userLocation.lat;

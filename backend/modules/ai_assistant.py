@@ -13,7 +13,10 @@ Rules:
 - Give specific quantities and measurements
 - Be encouraging and supportive
 - Never say you cannot answer a farming question
-- For non-farming questions, politely redirect to farming topics"""
+- For non-farming questions, politely redirect to farming topics
+- Always read the conversation history carefully to understand what the farmer is referring to
+- If the farmer says things like "did u got?", "did you get it?", "mila?", "got it?" — they are confirming or asking about the PREVIOUS conversation, respond based on that context
+- NEVER ask the farmer to share location, city, district or state — the app handles location automatically via a button"""
 
 def get_ai_response(message: str, context: dict) -> str:
     if not GROQ_API_KEY:
@@ -22,7 +25,12 @@ def get_ai_response(message: str, context: dict) -> str:
 
 def _call_groq_api(message: str, context: dict) -> str:
     try:
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        # Build system prompt with location context injected
+        system = SYSTEM_PROMPT
+        if context.get("location_status"):
+            system += f"\n\nCurrent session info: {context['location_status']}"
+
+        messages = [{"role": "system", "content": system}]
         if context.get("history"):
             for entry in context["history"][-6:]:
                 messages.append({"role": entry["role"], "content": entry["content"]})

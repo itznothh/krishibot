@@ -104,7 +104,13 @@ def chat():
         if not message:
             return jsonify({"error": "No message provided"}), 400
 
-        # --- AI intent classification ---
+        # Enrich context with location status so AI is always aware
+        if lat and lon:
+            context['location_status'] = f"User's GPS location is available (lat={lat}, lon={lon}). Location was successfully shared via the app."
+        else:
+            context['location_status'] = "User has not shared GPS location yet. They can click the 📍 button to share it."
+
+        # ---- AI intent classification ---
         intent = classify_intent(message)
 
         # ---- Weather ----
