@@ -47,19 +47,26 @@ def chat():
                 weather_data = get_weather(float(lat), float(lon))
                 if "error" in weather_data:
                     return jsonify({"status": "error", "message": weather_data["error"]})
+                # If asking specifically about rain, add AI interpretation
+                if any(w in msg_lower for w in ['rain', 'barish', 'rainfall', 'chances', 'will it rain']):
+                    ai_msg = get_ai_response(
+                        f"Based on this weather data: {weather_data}, what are the rain chances? Give a short 2-3 line farmer-friendly answer.",
+                        context
+                    )
+                    weather_data["farming_advice"] = ai_msg
                 return jsonify({"status": "weather", "data": weather_data})
             else:
                 return jsonify({"status": "needs_location", "message": "📍 Please share your location to get weather information."})
+
+        # Pest intent — check BEFORE crop
+        elif any(w in msg_lower for w in ['pest', 'insect', 'bug', 'disease', 'fungus', 'aphid', 'worm', 'keeda', 'rog', 'bimari', 'neem', 'caterpillar', 'blight', 'rust', 'mildew', 'thrips', 'whitefly']):
+            response = get_pest_advice(message)
+            return jsonify({"status": "pest_advice", "message": response})
 
         # Crop recommendation intent
         elif any(w in msg_lower for w in ['crop', 'grow', 'plant', 'seed', 'kharif', 'rabi', 'zaid', 'fasal', 'ugao', 'soil', 'loamy', 'sandy', 'black soil', 'clay']):
             response = recommend_crops(message, context)
             return jsonify({"status": "crop_advice", "message": response})
-
-        # Pest intent
-        elif any(w in msg_lower for w in ['pest', 'insect', 'bug', 'disease', 'fungus', 'aphid', 'worm', 'keeda', 'rog', 'bimari', 'neem']):
-            response = get_pest_advice(message)
-            return jsonify({"status": "pest_advice", "message": response})
 
         # Fertilizer intent
         elif any(w in msg_lower for w in ['fertilizer', 'fertiliser', 'npk', 'urea', 'dap', 'manure', 'khad', 'nitrogen', 'phosphorus', 'potassium', 'organic']):
