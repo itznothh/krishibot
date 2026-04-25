@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import json
+import base64
 
 from modules.weather import get_weather
 from modules.crop_recommender import recommend_crops
@@ -13,6 +14,7 @@ from modules.pest_advisor import get_pest_advice
 from modules.fertilizer import get_fertilizer_advice
 from modules.ai_assistant import get_ai_response
 from modules.language import detect_language, translate_response
+from modules.image_analyzer import analyze_crop_image
 
 app = Flask(__name__)
 CORS(app)
@@ -54,18 +56,16 @@ def classify_intent(message: str) -> str:
         resp = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             max_tokens=60,
-            temperature=0,          # Deterministic for classification
+            temperature=0,
             messages=[
                 {"role": "system", "content": INTENT_SYSTEM_PROMPT},
                 {"role": "user",   "content": message},
             ],
         )
         raw = resp.choices[0].message.content.strip()
-        # Strip markdown fences if present
         raw = raw.replace("```json", "").replace("```", "").strip()
         data = json.loads(raw)
         intent = data.get("intent", "general")
-        # Validate intent is one of the known values
         if intent not in ("weather", "pest", "crop", "fertilizer", "general"):
             return "general"
         return intent
@@ -104,23 +104,19 @@ def chat():
         if not message:
             return jsonify({"error": "No message provided"}), 400
 
-        # Enrich context with location status so AI is always aware
         if lat and lon:
             context['location_status'] = f"User's GPS location is available (lat={lat}, lon={lon}). Location was successfully shared via the app."
         else:
             context['location_status'] = "User has not shared GPS location yet. They can click the 📍 button to share it."
 
-        # ---- AI intent classification ---
         intent = classify_intent(message)
 
-        # ---- Weather ----
         if intent == "weather":
             if lat and lon:
                 weather_data = get_weather(float(lat), float(lon))
                 if "error" in weather_data:
                     return jsonify({"status": "error", "message": weather_data["error"]})
 
-                # Always generate a farming advice summary for the weather card
                 msg_lower = message.lower()
                 if any(w in msg_lower for w in ['rain', 'barish', 'rainfall', 'chances', 'will it rain']):
                     prompt = (
@@ -134,7 +130,6 @@ def chat():
                         "(e.g. irrigation, spraying, harvesting advice)."
                     )
                 weather_data["farming_advice"] = get_ai_response(prompt, context)
-
                 return jsonify({"status": "weather", "data": weather_data})
             else:
                 return jsonify({
@@ -142,28 +137,48 @@ def chat():
                     "message": "📍 Please share your location to get weather information."
                 })
 
-        # ---- Pest / Disease ----
         elif intent == "pest":
             response = get_pest_advice(message)
             return jsonify({"status": "pest_advice", "message": response})
 
-        # ---- Crop Recommendation ----
         elif intent == "crop":
             response = recommend_crops(message, context)
             return jsonify({"status": "crop_advice", "message": response})
 
-        # ---- Fertilizer ----
         elif intent == "fertilizer":
             response = get_fertilizer_advice(message)
             return jsonify({"status": "fertilizer", "message": response})
 
-        # ---- General / Ambiguous — full AI assistant ----
         else:
             response = get_ai_response(message, context)
             return jsonify({"status": "ai_response", "message": response})
 
     except Exception as e:
         return jsonify({"status": "error", "message": f"Server error: {str(e)}"}), 500
+
+
+# ---------------------------------------------------------------------------
+# NEW: Image Analysis Route (Gemini Vision) — added without changing above
+# ---------------------------------------------------------------------------
+
+@app.route('/analyze-image', methods=['POST'])
+def analyze_image():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        image_base64 = data.get('image')
+        mime_type = data.get('mime_type', 'image/jpeg')
+
+        if not image_base64:
+            return jsonify({"error": "No image provided"}), 400
+
+        result = analyze_crop_image(image_base64, mime_type)
+        return jsonify({"status": "image_analysis", "message": result})
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Image analysis error: {str(e)}"}), 500
 
 
 if __name__ == '__main__':
