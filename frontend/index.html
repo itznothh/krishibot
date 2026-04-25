@@ -97,6 +97,13 @@
       .msg { max-width: 92%; }
       .header-text h1 { font-size: 1.1rem; }
     }
+
+    /* Camera feature */
+    .cam-icon-btn { background: none; border: none; font-size: 1.3rem; cursor: pointer; padding: 8px; border-radius: 50%; transition: background 0.2s; flex-shrink: 0; }
+    .cam-icon-btn:hover { background: #e8f5e9; }
+    .tag.image { background: #e8f5e9; color: #1b5e20; }
+    .image-preview { max-width: 200px; border-radius: 10px; margin: 6px 0; border: 2px solid #4a9a4a; }
+    #image-input { display: none; }
   </style>
 </head>
 <body>
@@ -133,9 +140,13 @@
 <!-- Chat Area -->
 <div class="chat-area" id="chat-area"></div>
 
+<!-- Hidden image input -->
+<input type="file" id="image-input" accept="image/*" capture="environment" onchange="handleImageUpload(event)">
+
 <!-- Input Bar -->
 <div class="input-bar">
   <button class="loc-icon-btn" onclick="shareLocation()" title="Share Location">📍</button>
+  <button class="cam-icon-btn" onclick="document.getElementById('image-input').click()" title="Scan Crop Disease">📷</button>
   <textarea class="msg-input" id="msg-input" placeholder="Ask me anything about farming... (e.g., 'Best crop for black soil')" rows="1"
     onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"
     oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
@@ -405,6 +416,82 @@ async function sendMessage() {
     document.getElementById('send-btn').disabled = false;
     input.focus();
   }
+}
+
+// ─────────────────────────────────────────────
+// Image Analysis (NEW — Gemini Vision)
+// ─────────────────────────────────────────────
+async function handleImageUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // Show image preview in chat
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const base64 = e.target.result.split(',')[1];
+    const mimeType = file.type || 'image/jpeg';
+
+    // Show user image bubble
+    const ca = document.getElementById('chat-area');
+    const imgDiv = document.createElement('div');
+    imgDiv.className = 'msg user';
+    imgDiv.innerHTML = `
+      <div class="avatar">👨‍🌾</div>
+      <div class="bubble">
+        📷 Crop image sent for analysis<br>
+        <img src="${e.target.result}" class="image-preview" alt="Crop image">
+      </div>`;
+    ca.appendChild(imgDiv);
+    scrollToBottom();
+
+    // Show typing
+    const typingId = addTyping();
+    document.getElementById('send-btn').disabled = true;
+    isLoading = true;
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+      const resp = await fetch(`${API_BASE}/analyze-image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mime_type: mimeType }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      removeTyping(typingId);
+
+      if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
+      const data = await resp.json();
+
+      // Show result
+      const resultDiv = document.createElement('div');
+      resultDiv.className = 'msg bot';
+      resultDiv.innerHTML = `
+        <div class="avatar">🌱</div>
+        <div class="bubble">
+          <span class="tag image">🔬 Disease Scanner</span><br>
+          ${formatText(data.message || 'Could not analyze image.')}
+        </div>`;
+      ca.appendChild(resultDiv);
+      scrollToBottom();
+
+    } catch (err) {
+      removeTyping(typingId);
+      if (err.name === 'AbortError') {
+        addBotMessage('⏳ Image analysis timed out. Please try again!', 'system');
+      } else {
+        addBotMessage('❌ Could not analyze image. Please try again.', 'system');
+      }
+    } finally {
+      isLoading = false;
+      document.getElementById('send-btn').disabled = false;
+      // Reset file input so same image can be re-uploaded
+      document.getElementById('image-input').value = '';
+    }
+  };
+  reader.readAsDataURL(file);
 }
 
 // ─────────────────────────────────────────────
