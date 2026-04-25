@@ -21,7 +21,7 @@ def analyze_crop_image(image_base64: str, mime_type: str = "image/jpeg") -> str:
     if not GEMINI_API_KEY:
         return "⚠️ Image analysis is not configured. Please set GEMINI_API_KEY."
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
         payload = {
             "contents": [{
                 "parts": [
