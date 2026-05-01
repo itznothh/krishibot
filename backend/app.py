@@ -21,10 +21,57 @@ CORS(app)
 
 
 # ---------------------------------------------------------------------------
-# Intent classifier — imported from intent_classifier.py to avoid circular imports
+# AI-powered intent classifier
 # ---------------------------------------------------------------------------
 
-from intent_classifier import classify_intent
+INTENT_SYSTEM_PROMPT = """You are an intent classifier for KrishiBot, an AI farming assistant.
+
+Given a farmer's message, classify it into EXACTLY ONE of these intents:
+- "weather"      : asking about weather, rain, forecast, temperature, humidity
+- "pest"         : asking about pests, insects, diseases, fungus, crop damage, treatment
+- "crop"         : asking what crops to grow, crop recommendations, planting advice
+- "fertilizer"   : asking about fertilizers, nutrients, NPK, manure, soil nutrition
+- "general"      : everything else — soil testing, government schemes, market prices,
+                   irrigation, farming tips, greetings, ambiguous or multi-topic questions
+
+Rules:
+- If the message is ambiguous (e.g., "soil test", "help", "what should I do?"), classify as "general"
+- If the message mentions BOTH pests AND crops, classify as "pest"
+- If the message mentions BOTH fertilizer AND crops, classify as "fertilizer"
+- Never force a message into crop/pest/fertilizer just because a related word appears
+- Respond ONLY with a JSON object like: {"intent": "weather", "confidence": "high"}
+- confidence is "high" or "low"
+"""
+
+
+def classify_intent(message: str) -> str:
+    """
+    Use Groq/llama to classify the user's intent.
+    Falls back to 'general' on any error so the bot never crashes.
+    """
+    try:
+        from groq import Groq
+        client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+        resp = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=60,
+            temperature=0,
+            messages=[
+                {"role": "system", "content": INTENT_SYSTEM_PROMPT},
+                {"role": "user",   "content": message},
+            ],
+        )
+        raw = resp.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        data = json.loads(raw)
+        intent = data.get("intent", "general")
+        if intent not in ("weather", "pest", "crop", "fertilizer", "general"):
+            return "general"
+        return intent
+    except Exception as e:
+        print(f"[intent_classifier] Error: {e} — falling back to 'general'")
+        return "general"
 
 
 # ---------------------------------------------------------------------------
@@ -132,65 +179,6 @@ def analyze_image():
 
     except Exception as e:
         return jsonify({"status": "error", "message": f"Image analysis error: {str(e)}"}), 500
-
-
-
-
-# ---------------------------------------------------------------------------
-# WhatsApp Webhook Routes — added below, nothing above changed
-# ---------------------------------------------------------------------------
-
-from whatsapp_handler import process_whatsapp_message, send_whatsapp_message
-
-WHATSAPP_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "krishibot_secret_123")
-
-
-@app.route('/webhook', methods=['GET'])
-def whatsapp_verify():
-    """Meta calls this to verify your webhook."""
-    mode = request.args.get('hub.mode')
-    token = request.args.get('hub.verify_token')
-    challenge = request.args.get('hub.challenge')
-    if mode == 'subscribe' and token == WHATSAPP_VERIFY_TOKEN:
-        print("[WhatsApp] Webhook verified!")
-        return challenge, 200
-    return "Forbidden", 403
-
-
-@app.route('/webhook', methods=['POST'])
-def whatsapp_webhook():
-    """Receives incoming WhatsApp messages from Meta."""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"status": "no data"}), 200
-
-        entry = data.get("entry", [])
-        if not entry:
-            return jsonify({"status": "no entry"}), 200
-
-        changes = entry[0].get("changes", [])
-        if not changes:
-            return jsonify({"status": "no changes"}), 200
-
-        value = changes[0].get("value", {})
-        messages = value.get("messages", [])
-        if not messages:
-            return jsonify({"status": "ok"}), 200
-
-        message_obj = messages[0]
-        phone = message_obj.get("from", "")
-        if not phone:
-            return jsonify({"status": "no phone"}), 200
-
-        print(f"[WhatsApp] Message from {phone}")
-        reply = process_whatsapp_message(phone, message_obj)
-        send_whatsapp_message(phone, reply)
-        return jsonify({"status": "ok"}), 200
-
-    except Exception as e:
-        print(f"[WhatsApp] Webhook error: {str(e)}")
-        return jsonify({"status": "error"}), 200
 
 
 if __name__ == '__main__':
