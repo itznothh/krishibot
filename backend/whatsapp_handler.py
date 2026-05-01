@@ -71,7 +71,7 @@ def format_weather_for_whatsapp(weather_data: dict) -> str:
         return "🌤️ Could not format weather. Please try again."
 
 def process_whatsapp_message(phone: str, message_obj: dict) -> str:
-    from app import classify_intent
+    from intent_classifier import classify_intent
     from modules.weather import get_weather
     from modules.crop_recommender import recommend_crops
     from modules.pest_advisor import get_pest_advice
