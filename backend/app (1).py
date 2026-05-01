@@ -181,6 +181,65 @@ def analyze_image():
         return jsonify({"status": "error", "message": f"Image analysis error: {str(e)}"}), 500
 
 
+
+
+# ---------------------------------------------------------------------------
+# WhatsApp Webhook Routes — added below, nothing above changed
+# ---------------------------------------------------------------------------
+
+from whatsapp_handler import process_whatsapp_message, send_whatsapp_message
+
+WHATSAPP_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "krishibot_secret_123")
+
+
+@app.route('/webhook', methods=['GET'])
+def whatsapp_verify():
+    """Meta calls this to verify your webhook."""
+    mode = request.args.get('hub.mode')
+    token = request.args.get('hub.verify_token')
+    challenge = request.args.get('hub.challenge')
+    if mode == 'subscribe' and token == WHATSAPP_VERIFY_TOKEN:
+        print("[WhatsApp] Webhook verified!")
+        return challenge, 200
+    return "Forbidden", 403
+
+
+@app.route('/webhook', methods=['POST'])
+def whatsapp_webhook():
+    """Receives incoming WhatsApp messages from Meta."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"status": "no data"}), 200
+
+        entry = data.get("entry", [])
+        if not entry:
+            return jsonify({"status": "no entry"}), 200
+
+        changes = entry[0].get("changes", [])
+        if not changes:
+            return jsonify({"status": "no changes"}), 200
+
+        value = changes[0].get("value", {})
+        messages = value.get("messages", [])
+        if not messages:
+            return jsonify({"status": "ok"}), 200
+
+        message_obj = messages[0]
+        phone = message_obj.get("from", "")
+        if not phone:
+            return jsonify({"status": "no phone"}), 200
+
+        print(f"[WhatsApp] Message from {phone}")
+        reply = process_whatsapp_message(phone, message_obj)
+        send_whatsapp_message(phone, reply)
+        return jsonify({"status": "ok"}), 200
+
+    except Exception as e:
+        print(f"[WhatsApp] Webhook error: {str(e)}")
+        return jsonify({"status": "error"}), 200
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
