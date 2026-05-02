@@ -104,6 +104,12 @@
     .tag.image { background: #e8f5e9; color: #1b5e20; }
     .image-preview { max-width: 200px; border-radius: 10px; margin: 6px 0; border: 2px solid #4a9a4a; }
     #image-input { display: none; }
+
+    /* Mic button */
+    .mic-icon-btn { background: none; border: none; font-size: 1.3rem; cursor: pointer; padding: 8px; border-radius: 50%; transition: all 0.2s; flex-shrink: 0; }
+    .mic-icon-btn:hover { background: #e8f5e9; }
+    .mic-icon-btn.recording { background: #ffebee; animation: micpulse 1s infinite; }
+    @keyframes micpulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
   </style>
 </head>
 <body>
@@ -147,6 +153,7 @@
 <div class="input-bar">
   <button class="loc-icon-btn" onclick="shareLocation()" title="Share Location">📍</button>
   <button class="cam-icon-btn" onclick="document.getElementById('image-input').click()" title="Scan Crop Disease">📷</button>
+  <button class="mic-icon-btn" id="mic-btn" onclick="toggleVoice()" title="Voice Input">🎤</button>
   <textarea class="msg-input" id="msg-input" placeholder="Ask me anything about farming... (e.g., 'Best crop for black soil')" rows="1"
     onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"
     oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
@@ -492,6 +499,76 @@ async function handleImageUpload(event) {
     }
   };
   reader.readAsDataURL(file);
+}
+
+// ─────────────────────────────────────────────
+// Voice Recognition
+// ─────────────────────────────────────────────
+let recognition = null;
+let isRecording = false;
+
+function toggleVoice() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Voice input is not supported in this browser. Please use Chrome or Edge.');
+    return;
+  }
+
+  if (isRecording) {
+    recognition.stop();
+    return;
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+
+  // Set language based on current selection
+  const langMap = { en: 'en-IN', hi: 'hi-IN', kn: 'kn-IN' };
+  recognition.lang = langMap[currentLang] || 'en-IN';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  const micBtn = document.getElementById('mic-btn');
+  const input = document.getElementById('msg-input');
+
+  recognition.onstart = () => {
+    isRecording = true;
+    micBtn.textContent = '🔴';
+    micBtn.classList.add('recording');
+    input.placeholder = 'Listening... speak now';
+  };
+
+  recognition.onresult = (event) => {
+    let transcript = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    input.value = transcript;
+    input.style.height = 'auto';
+    input.style.height = input.scrollHeight + 'px';
+  };
+
+  recognition.onend = () => {
+    isRecording = false;
+    micBtn.textContent = '🎤';
+    micBtn.classList.remove('recording');
+    input.placeholder = "Ask me anything about farming... (e.g., 'Best crop for black soil')";
+    // Auto-send if there's text
+    if (input.value.trim()) {
+      setTimeout(() => sendMessage(), 500);
+    }
+  };
+
+  recognition.onerror = (event) => {
+    isRecording = false;
+    micBtn.textContent = '🎤';
+    micBtn.classList.remove('recording');
+    input.placeholder = "Ask me anything about farming... (e.g., 'Best crop for black soil')";
+    if (event.error !== 'no-speech') {
+      addBotMessage('❌ Voice input error: ' + event.error + '. Please try again.', 'system');
+    }
+  };
+
+  recognition.start();
 }
 
 // ─────────────────────────────────────────────
