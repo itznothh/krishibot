@@ -21,6 +21,43 @@ CORS(app)
 
 
 # ---------------------------------------------------------------------------
+# WhatsApp Session Storage (persistent location memory)
+# ---------------------------------------------------------------------------
+
+SESSIONS_FILE = '/tmp/wa_sessions.json'
+
+def load_sessions():
+    try:
+        with open(SESSIONS_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_sessions(sessions):
+    try:
+        with open(SESSIONS_FILE, 'w') as f:
+            json.dump(sessions, f)
+    except Exception as e:
+        print(f"[session] Save error: {e}")
+
+def get_user_location(sender):
+    sessions = load_sessions()
+    user = sessions.get(sender, {})
+    lat = user.get('lat')
+    lon = user.get('lon')
+    return lat, lon
+
+def set_user_location(sender, lat, lon):
+    sessions = load_sessions()
+    if sender not in sessions:
+        sessions[sender] = {}
+    sessions[sender]['lat'] = lat
+    sessions[sender]['lon'] = lon
+    save_sessions(sessions)
+    print(f"[session] Saved location for {sender}: {lat}, {lon}")
+
+
+# ---------------------------------------------------------------------------
 # AI-powered intent classifier
 # ---------------------------------------------------------------------------
 
