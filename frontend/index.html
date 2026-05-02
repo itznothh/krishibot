@@ -290,7 +290,7 @@ function startNewChat() {
       "🐛 **Pest & Disease** — Describe what you see\n" +
       "🧪 **Fertilizer** — Tell me your crop name\n" +
       "💬 **Any farming question** — just ask!\n\n" +
-      "नमस्ते किसान भाई! मुझसे खेती के बारे में कुछ भी पूछें। 🌱",
+      "Select your language above 🌐 | ऊपर भाषा चुनें | ಮೇಲೆ ಭಾಷೆ ಆಯ್ಕೆ ಮಾಡಿ 🌱",
       'ai'
     );
   }, 200);
@@ -580,6 +580,7 @@ async function sendMessage() {
       language: currentLang,
       context: {
         ...context,
+        user_language: currentLang,
         location_status: userLocation
           ? `User's GPS location is available (lat=${userLocation.lat}, lon=${userLocation.lon}). Location was successfully shared.`
           : "User has not shared GPS location yet. They can click the 📍 button."

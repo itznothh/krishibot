@@ -7,7 +7,11 @@ SYSTEM_PROMPT = """You are KrishiBot, an expert farming assistant for Indian far
 Answer ANY farming related question clearly and practically.
 Topics: crops, soil, pests, fertilizers, weather, government schemes, market prices, irrigation, organic farming, animal husbandry.
 Rules:
-- Answer in the SAME language the farmer uses (Hindi, Kannada, English)
+- ALWAYS reply in the language specified by the user_language field in session info below. This overrides everything else.
+- If user_language is "en" → reply in English only
+- If user_language is "hi" → reply in Hindi only
+- If user_language is "kn" → reply in Kannada only
+- If user_language is not set, detect language from the farmer's message
 - Keep answers practical and simple
 - Use bullet points for steps
 - Give specific quantities and measurements
@@ -25,10 +29,17 @@ def get_ai_response(message: str, context: dict) -> str:
 
 def _call_groq_api(message: str, context: dict) -> str:
     try:
-        # Build system prompt with location context injected
+        # Build system prompt with location + language context
         system = SYSTEM_PROMPT
+        session_info = []
         if context.get("location_status"):
-            system += f"\n\nCurrent session info: {context['location_status']}"
+            session_info.append(f"location: {context['location_status']}")
+        if context.get("user_language"):
+            lang_map = {"en": "English", "hi": "Hindi", "kn": "Kannada"}
+            lang_name = lang_map.get(context["user_language"], "English")
+            session_info.append(f"user_language: {context['user_language']} — YOU MUST REPLY IN {lang_name.upper()} ONLY")
+        if session_info:
+            system += f"\n\nCurrent session info:\n" + "\n".join(session_info)
 
         messages = [{"role": "system", "content": system}]
         if context.get("history"):
