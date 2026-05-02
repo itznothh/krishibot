@@ -158,7 +158,7 @@ def chat():
 
 
 # ---------------------------------------------------------------------------
-# NEW: Image Analysis Route (Gemini Vision) — added without changing above
+# Image Analysis Route (Gemini Vision)
 # ---------------------------------------------------------------------------
 
 @app.route('/analyze-image', methods=['POST'])
@@ -179,6 +179,60 @@ def analyze_image():
 
     except Exception as e:
         return jsonify({"status": "error", "message": f"Image analysis error: {str(e)}"}), 500
+
+
+# ---------------------------------------------------------------------------
+# WhatsApp Webhook (Twilio)
+# ---------------------------------------------------------------------------
+
+@app.route('/whatsapp', methods=['POST'])
+def whatsapp():
+    try:
+        from twilio.twiml.messaging_response import MessagingResponse
+
+        incoming_msg = request.form.get('Body', '').strip()
+        sender = request.form.get('From', '')
+
+        if not incoming_msg:
+            resp = MessagingResponse()
+            resp.message("Namaste! 🙏 Please send a message to get started.")
+            return str(resp)
+
+        # Use existing AI intent classifier
+        context = {}
+        intent = classify_intent(incoming_msg)
+
+        if intent == "weather":
+            reply = (
+                "🌦️ *Weather Feature*\n\n"
+                "To get weather, please visit our web app and share your location:\n"
+                "👉 https://krishibot-flame.vercel.app\n\n"
+                "Or tell me your city name and I'll give farming advice!"
+            )
+
+        elif intent == "pest":
+            reply = get_pest_advice(incoming_msg)
+
+        elif intent == "crop":
+            reply = recommend_crops(incoming_msg, context)
+
+        elif intent == "fertilizer":
+            reply = get_fertilizer_advice(incoming_msg)
+
+        else:
+            reply = get_ai_response(incoming_msg, context)
+
+        # Clean markdown for WhatsApp format
+        reply = reply.replace('**', '*').replace('# ', '').replace('## ', '')
+
+        resp = MessagingResponse()
+        resp.message(reply)
+        return str(resp)
+
+    except Exception as e:
+        resp = MessagingResponse()
+        resp.message("Sorry, something went wrong. Please try again. 🙏")
+        return str(resp)
 
 
 if __name__ == '__main__':
