@@ -274,9 +274,7 @@ def whatsapp():
                 f"🌬️ *Wind:* {weather_data.get('wind_speed')} m/s\n\n"
                 f"🌾 *Farming Advice:*\n{weather_data.get('farming_advice')}"
             )
-            reply += "
-
-✅ _Location saved! I'll remember it for future weather queries._"
+            reply += "\n\n✅ _Location saved! I will remember it for future weather queries._"
             resp.message(reply)
             return str(resp)
 
