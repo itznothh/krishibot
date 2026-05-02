@@ -189,25 +189,80 @@ def analyze_image():
 def whatsapp():
     try:
         from twilio.twiml.messaging_response import MessagingResponse
+        import requests as req
 
         incoming_msg = request.form.get('Body', '').strip()
         sender = request.form.get('From', '')
+        num_media = int(request.form.get('NumMedia', 0))
+        latitude = request.form.get('Latitude', '')
+        longitude = request.form.get('Longitude', '')
 
-        if not incoming_msg:
-            resp = MessagingResponse()
-            resp.message("Namaste! 🙏 Please send a message to get started.")
+        resp = MessagingResponse()
+
+        # ── Handle image sent on WhatsApp ──────────────────────────────────
+        if num_media > 0:
+            media_url = request.form.get('MediaUrl0', '')
+            media_type = request.form.get('MediaContentType0', 'image/jpeg')
+
+            if 'image' in media_type:
+                account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
+                auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
+                img_response = req.get(media_url, auth=(account_sid, auth_token), timeout=15)
+                image_base64 = base64.b64encode(img_response.content).decode('utf-8')
+                result = analyze_crop_image(image_base64, media_type)
+                result = result.replace('**', '*').replace('# ', '').replace('## ', '')
+                resp.message("🔬 *Disease Scanner*\n\n" + result)
+            else:
+                resp.message("⚠️ Please send an image of your crop for disease analysis.")
             return str(resp)
 
-        # Use existing AI intent classifier
+        # ── Handle location shared on WhatsApp ─────────────────────────────
+        if latitude and longitude:
+            weather_data = get_weather(float(latitude), float(longitude))
+            if "error" in weather_data:
+                resp.message("❌ Could not fetch weather. Please try again.")
+                return str(resp)
+            prompt = (
+                f"Based on this weather data: {weather_data}, give a short 2-3 line "
+                "farmer-friendly tip on how this weather affects farming today."
+            )
+            weather_data["farming_advice"] = get_ai_response(prompt, {})
+            reply = (
+                f"🌦️ *Weather Update*\n\n"
+                f"📍 *Location:* {weather_data.get('location', 'Your area')}\n"
+                f"🌡️ *Temperature:* {weather_data.get('temperature')}°C\n"
+                f"💧 *Humidity:* {weather_data.get('humidity')}%\n"
+                f"🌤️ *Condition:* {weather_data.get('condition')}\n"
+                f"🌬️ *Wind:* {weather_data.get('wind_speed')} m/s\n\n"
+                f"🌾 *Farming Advice:*\n{weather_data.get('farming_advice')}"
+            )
+            resp.message(reply)
+            return str(resp)
+
+        # ── Handle text message ────────────────────────────────────────────
+        if not incoming_msg:
+            resp.message(
+                "Namaste! 🙏 Welcome to *KrishiBot*\n\n"
+                "I can help you with:\n"
+                "🌾 Crop advice\n"
+                "🐛 Pest & disease\n"
+                "🧪 Fertilizer guidance\n"
+                "🌦️ Weather — *share your location* for real-time data\n"
+                "📷 Disease scan — *send a crop photo*\n\n"
+                "Just ask anything in English, Hindi or Kannada!"
+            )
+            return str(resp)
+
+        # ── Weather by city name ───────────────────────────────────────────
         context = {}
         intent = classify_intent(incoming_msg)
 
         if intent == "weather":
             reply = (
                 "🌦️ *Weather Feature*\n\n"
-                "To get weather, please visit our web app and share your location:\n"
-                "👉 https://krishibot-flame.vercel.app\n\n"
-                "Or tell me your city name and I'll give farming advice!"
+                "Share your *location* on WhatsApp for real-time weather:\n"
+                "📎 Attachment → Location → Send\n\n"
+                "Or visit: https://krishibot-flame.vercel.app"
             )
 
         elif intent == "pest":
@@ -225,7 +280,6 @@ def whatsapp():
         # Clean markdown for WhatsApp format
         reply = reply.replace('**', '*').replace('# ', '').replace('## ', '')
 
-        resp = MessagingResponse()
         resp.message(reply)
         return str(resp)
 
