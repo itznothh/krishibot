@@ -110,10 +110,53 @@
     .mic-icon-btn:hover { background: #e8f5e9; }
     .mic-icon-btn.recording { background: #ffebee; animation: micpulse 1s infinite; }
     @keyframes micpulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
+
+    /* ── Sidebar / History ── */
+    .app-wrapper { display: flex; height: 100vh; overflow: hidden; flex-direction: column; }
+    .main-layout { display: flex; flex: 1; overflow: hidden; }
+    .sidebar { width: 260px; background: #1a3a1a; color: white; display: flex; flex-direction: column; transition: transform 0.3s; flex-shrink: 0; }
+    .sidebar-header { padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; }
+    .sidebar-header h3 { font-size: 0.95rem; font-weight: 600; opacity: 0.9; }
+    .new-chat-btn { background: #4a9a4a; color: white; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: background 0.2s; white-space: nowrap; }
+    .new-chat-btn:hover { background: #2d6a2d; }
+    .history-list { flex: 1; overflow-y: auto; padding: 8px; }
+    .history-list::-webkit-scrollbar { width: 4px; }
+    .history-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+    .history-item { padding: 10px 12px; border-radius: 8px; cursor: pointer; margin-bottom: 4px; transition: background 0.2s; display: flex; align-items: center; gap: 8px; }
+    .history-item:hover { background: rgba(255,255,255,0.1); }
+    .history-item.active { background: rgba(74,154,74,0.4); }
+    .history-item-text { flex: 1; min-width: 0; }
+    .history-title { font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.9; }
+    .history-date { font-size: 0.7rem; opacity: 0.5; margin-top: 2px; }
+    .history-del { opacity: 0; font-size: 0.75rem; cursor: pointer; padding: 2px 6px; border-radius: 4px; background: rgba(255,0,0,0.2); border: none; color: white; transition: opacity 0.2s; flex-shrink: 0; }
+    .history-item:hover .history-del { opacity: 1; }
+    .sidebar-footer { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.7rem; opacity: 0.4; text-align: center; }
+    .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .sidebar-toggle { background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+    .sidebar-toggle:hover { background: rgba(255,255,255,0.1); }
+    @media (max-width: 600px) {
+      .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 1000; transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+      .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; }
+      .sidebar-overlay.open { display: block; }
+    }
   </style>
 </head>
 <body>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<div class="app-wrapper">
 
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <h3>💬 Chat History</h3>
+    <button class="new-chat-btn" onclick="startNewChat()">+ New Chat</button>
+  </div>
+  <div class="history-list" id="history-list"></div>
+  <div class="sidebar-footer">History saved on this device only</div>
+</div>
+
+<div class="main-content">
 <!-- Header -->
 <div class="header">
   <div class="header-icon">🌱</div>
@@ -121,6 +164,7 @@
     <h1>KrishiBot</h1>
     <p>Smart Farming Assistant · किसान मित्र</p>
   </div>
+  <button class="sidebar-toggle" onclick="toggleSidebar()" title="Chat History">☰</button>
   <div class="header-icons">🌿 🍃 🌾</div>
 </div>
 
@@ -181,6 +225,182 @@ let currentLang = 'en';
 let userLocation = null;
 let isLoading = false;
 let context = { history: [] };
+let currentChatId = null;
+let sidebarOpen = false;
+
+// ─────────────────────────────────────────────
+// History / localStorage
+// ─────────────────────────────────────────────
+const STORAGE_KEY = 'krishibot_chats';
+
+function getAllChats() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function saveAllChats(chats) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+}
+
+function generateId() {
+  return 'chat_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
+}
+
+function getCurrentChat() {
+  const chats = getAllChats();
+  return chats[currentChatId] || null;
+}
+
+function saveChatMessage(role, content, type) {
+  if (!currentChatId) return;
+  const chats = getAllChats();
+  if (!chats[currentChatId]) return;
+  chats[currentChatId].messages.push({ role, content, type, ts: Date.now() });
+  // Update title from first user message
+  if (role === 'user' && chats[currentChatId].messages.filter(m => m.role === 'user').length === 1) {
+    chats[currentChatId].title = content.slice(0, 40) + (content.length > 40 ? '...' : '');
+  }
+  chats[currentChatId].updatedAt = Date.now();
+  saveAllChats(chats);
+  renderSidebar();
+}
+
+function startNewChat() {
+  // Save current chat first
+  saveCurrentContext();
+  
+  currentChatId = generateId();
+  const chats = getAllChats();
+  chats[currentChatId] = {
+    id: currentChatId,
+    title: 'New Chat',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    messages: [],
+    context: { history: [] }
+  };
+  saveAllChats(chats);
+
+  // Clear UI
+  document.getElementById('chat-area').innerHTML = '';
+  context = { history: [] };
+  userLocation = null;
+
+  renderSidebar();
+  closeSidebar();
+
+  // Show welcome message
+  setTimeout(() => {
+    addBotMessage(
+      "**Namaste! 🙏 Welcome to KrishiBot!**\n\n" +
+      "I can help you with:\n" +
+      "🌦️ **Weather** — Click 📍 to share location\n" +
+      "🌾 **Crop Advice** — Tell me your soil type & season\n" +
+      "🐛 **Pest & Disease** — Describe what you see\n" +
+      "🧪 **Fertilizer** — Tell me your crop name\n" +
+      "💬 **Any farming question** — just ask!\n\n" +
+      "नमस्ते किसान भाई! मुझसे खेती के बारे में कुछ भी पूछें। 🌱",
+      'ai'
+    );
+  }, 200);
+}
+
+function saveCurrentContext() {
+  if (!currentChatId) return;
+  const chats = getAllChats();
+  if (chats[currentChatId]) {
+    chats[currentChatId].context = context;
+    saveAllChats(chats);
+  }
+}
+
+function loadChat(chatId) {
+  saveCurrentContext();
+  currentChatId = chatId;
+  const chats = getAllChats();
+  const chat = chats[chatId];
+  if (!chat) return;
+
+  // Restore context
+  context = chat.context || { history: [] };
+
+  // Clear and rebuild chat UI
+  const ca = document.getElementById('chat-area');
+  ca.innerHTML = '';
+
+  chat.messages.forEach(msg => {
+    if (msg.role === 'user') {
+      const div = document.createElement('div');
+      div.className = 'msg user';
+      div.innerHTML = `<div class="avatar">👨‍🌾</div><div class="bubble">${msg.content}</div>`;
+      ca.appendChild(div);
+    } else {
+      const div = document.createElement('div');
+      div.className = 'msg bot';
+      const tagLabels = { weather: '🌦️ Weather', crop_advice: '🌾 Crop Advisor', pest_advice: '🐛 Pest Advisor', fertilizer: '🧪 Fertilizer', ai: '🤖 AI Assistant', system: '⚠️ System' };
+      const tagClass = { weather: 'weather', crop_advice: 'crop', pest_advice: 'pest', fertilizer: 'fertilizer', ai: 'ai', system: 'system' };
+      const tag = tagLabels[msg.type] || '🤖 AI Assistant';
+      const cls = tagClass[msg.type] || 'ai';
+      div.innerHTML = `<div class="avatar">🌱</div><div class="bubble"><span class="tag ${cls}">${tag}</span><br>${formatText(msg.content)}</div>`;
+      ca.appendChild(div);
+    }
+  });
+
+  scrollToBottom();
+  renderSidebar();
+  closeSidebar();
+}
+
+function deleteChat(chatId, event) {
+  event.stopPropagation();
+  const chats = getAllChats();
+  delete chats[chatId];
+  saveAllChats(chats);
+  
+  if (currentChatId === chatId) {
+    startNewChat();
+  } else {
+    renderSidebar();
+  }
+}
+
+function renderSidebar() {
+  const list = document.getElementById('history-list');
+  const chats = getAllChats();
+  const sorted = Object.values(chats).sort((a, b) => b.updatedAt - a.updatedAt);
+
+  if (sorted.length === 0) {
+    list.innerHTML = '<div style="padding:16px;opacity:0.4;font-size:0.8rem;text-align:center">No chat history yet</div>';
+    return;
+  }
+
+  list.innerHTML = sorted.map(chat => {
+    const date = new Date(chat.updatedAt);
+    const dateStr = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    const isActive = chat.id === currentChatId;
+    return `
+      <div class="history-item ${isActive ? 'active' : ''}" onclick="loadChat('${chat.id}')">
+        <div style="font-size:1rem">💬</div>
+        <div class="history-item-text">
+          <div class="history-title">${chat.title || 'New Chat'}</div>
+          <div class="history-date">${dateStr}</div>
+        </div>
+        <button class="history-del" onclick="deleteChat('${chat.id}', event)">🗑️</button>
+      </div>`;
+  }).join('');
+}
+
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('open', sidebarOpen);
+  document.getElementById('sidebar-overlay').classList.toggle('open', sidebarOpen);
+}
+
+function closeSidebar() {
+  sidebarOpen = false;
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
 
 // ─────────────────────────────────────────────
 // Language
@@ -214,6 +434,7 @@ function addUserMessage(text) {
   div.innerHTML = `<div class="avatar">👨‍🌾</div><div class="bubble">${text}</div>`;
   ca.appendChild(div);
   scrollToBottom();
+  saveChatMessage('user', text, 'user');
 }
 
 function addBotMessage(content, type = 'ai') {
@@ -241,6 +462,7 @@ function addBotMessage(content, type = 'ai') {
     </div>`;
   ca.appendChild(div);
   scrollToBottom();
+  saveChatMessage('bot', content, type);
 }
 
 function addWeatherCard(data) {
@@ -575,20 +797,19 @@ function toggleVoice() {
 // Init
 // ─────────────────────────────────────────────
 window.addEventListener('load', () => {
-  setTimeout(() => {
-    addBotMessage(
-      "**Namaste! 🙏 Welcome to KrishiBot!**\n\n" +
-      "I can help you with:\n" +
-      "🌦️ **Weather** — Click 📍 to share location\n" +
-      "🌾 **Crop Advice** — Tell me your soil type & season\n" +
-      "🐛 **Pest & Disease** — Describe what you see\n" +
-      "🧪 **Fertilizer** — Tell me your crop name\n" +
-      "💬 **Any farming question** — just ask!\n\n" +
-      "नमस्ते किसान भाई! मुझसे खेती के बारे में कुछ भी पूछें। 🌱",
-      'ai'
-    );
-  }, 300);
+  renderSidebar();
+  const chats = getAllChats();
+  const sorted = Object.values(chats).sort((a, b) => b.updatedAt - a.updatedAt);
+  if (sorted.length > 0) {
+    // Load most recent chat
+    loadChat(sorted[0].id);
+  } else {
+    // Start fresh
+    startNewChat();
+  }
 });
 </script>
+</div><!-- end main-content -->
+</div><!-- end app-wrapper -->
 </body>
 </html>
