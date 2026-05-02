@@ -64,7 +64,7 @@ def set_user_location(sender, lat, lon):
 INTENT_SYSTEM_PROMPT = """You are an intent classifier for KrishiBot, an AI farming assistant.
 
 Given a farmer's message, classify it into EXACTLY ONE of these intents:
-- "weather"      : asking about weather, rain, forecast, temperature, humidity
+- "weather"      : asking about weather, rain, forecast, temperature, humidity, hailstorm, storm, future weather, chances of rain, will it rain, climate
 - "pest"         : asking about pests, insects, diseases, fungus, crop damage, treatment
 - "crop"         : asking what crops to grow, crop recommendations, planting advice
 - "fertilizer"   : asking about fertilizers, nutrients, NPK, manure, soil nutrition
@@ -255,6 +255,7 @@ def whatsapp():
 
         # ── Handle location shared on WhatsApp ─────────────────────────────
         if latitude and longitude:
+            set_user_location(sender, float(latitude), float(longitude))
             weather_data = get_weather(float(latitude), float(longitude))
             if "error" in weather_data:
                 resp.message("❌ Could not fetch weather. Please try again.")
@@ -273,6 +274,9 @@ def whatsapp():
                 f"🌬️ *Wind:* {weather_data.get('wind_speed')} m/s\n\n"
                 f"🌾 *Farming Advice:*\n{weather_data.get('farming_advice')}"
             )
+            reply += "
+
+✅ _Location saved! I'll remember it for future weather queries._"
             resp.message(reply)
             return str(resp)
 
