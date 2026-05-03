@@ -1082,7 +1082,7 @@ function appendBotBubble(text, type) {
   };
   const labelMap = {
     weather:'🌦️ Weather', crop_advice:'🌾 Crop Advisor', pest_advice:'🐛 Pest Advisor',
-    fertilizer:'🧪 Fertilizer', ai_response:'🤖 AI Assistant', system:'⚙️ System', image:'🔬 Disease Scanner'
+    fertilizer:'🧪 Fertilizer', ai_response:'🤖 KrishiBot', system:'⚙️ System', image:'🔬 Disease Scanner'
   };
   const tagCls = tagMap[type] || 'tag-ai';
   const tagLabel = labelMap[type] || '🤖 KrishiBot';
@@ -1224,7 +1224,8 @@ async function sendMessage() {
         ...context,
         location_status: userLocation
           ? `GPS available (lat=${userLocation.lat}, lon=${userLocation.lon})`
-          : 'GPS not shared yet'
+          : 'GPS not shared yet',
+        user_language: currentLang
       }
     };
     if (userLocation) { payload.lat = userLocation.lat; payload.lon = userLocation.lon; }
