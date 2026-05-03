@@ -57,9 +57,9 @@
                │                  │                  │
                ▼                  ▼                  ▼
           ┌─────────┐      ┌────────────┐    ┌──────────────┐
-          │  Groq   │      │ OpenWeather│    │    Gemini    │
+          │  Groq   │      │ OpenWeather│    │    Groq      │
           │ LLaMA   │      │    API     │    │    Vision    │
-          │  3.3    │      │            │    │    (Images)  │
+          │  3.3    │      │            │    │   (Images)   │
           └─────────┘      └────────────┘    └──────────────┘
 ```
 
@@ -72,7 +72,7 @@
 | Frontend | HTML, CSS, Vanilla JavaScript |
 | Backend | Python, Flask |
 | AI Model | Groq API → `llama-3.3-70b-versatile` |
-| Image Analysis | Google Gemini Vision |
+| Image Analysis | Groq LLaMA Vision |
 | Weather | OpenWeatherMap API |
 | WhatsApp | Twilio Messaging API |
 | Frontend Hosting | Vercel |
@@ -151,7 +151,6 @@ Create a `.env` file in the `backend/` folder:
 ```env
 GROQ_API_KEY=your_groq_api_key
 OPENWEATHER_API_KEY=your_openweather_api_key
-GEMINI_API_KEY=your_gemini_api_key
 TWILIO_ACCOUNT_SID=your_twilio_sid
 TWILIO_AUTH_TOKEN=your_twilio_token
 ```
@@ -197,7 +196,7 @@ Open `frontend/index.html` in your browser.
 |-----|---------|-----------|
 | [Groq](https://console.groq.com) | AI responses + intent classification | ✅ Free |
 | [OpenWeatherMap](https://openweathermap.org/api) | Real-time weather data | ✅ Free (1000 calls/day) |
-| [Google Gemini](https://ai.google.dev) | Crop disease image analysis | ✅ Free tier |
+| [Groq](https://console.groq.com) | Image analysis (vision model) | ✅ Free |
 | [Twilio](https://twilio.com) | WhatsApp messaging | ✅ Sandbox free |
 
 ---
