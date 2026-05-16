@@ -4,30 +4,33 @@ import { auth } from "./firebase";
 import { useAuth } from "./hooks/useAuth";
 import Landing from "./components/Landing";
 import LoginModal from "./components/LoginModal";
+import ChatUI from "./components/ChatUI";
 
 export default function App() {
   const { user, loading } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
-  const [showChat, setShowChat] = useState(false);
+  const [showChat, setShowChat]   = useState(false);
 
   if (loading) {
     return (
-      <div style={{ minHeight:"100vh", background:"#141a12", display:"flex", alignItems:"center", justifyContent:"center" }}>
-        <div style={{ color:"#6aaa7a", fontSize:"1.2rem", fontFamily:"sans-serif" }}>🌾 Loading KrishiBot…</div>
+      <div style={{ minHeight:"100vh", background:"#0e1510", display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <div style={{ color:"#6aaa7a", fontSize:"1.1rem", fontFamily:"'Nunito',sans-serif" }}>🌾 Loading KrishiBot…</div>
       </div>
     );
   }
 
-  // Chat view (Phase 3 — coming soon)
-  if (showChat) {
+  const handleEnter = () => {
+    if (!user) { setShowLogin(true); return; }
+    setShowChat(true);
+  };
+
+  if (showChat && user) {
     return (
-      <div style={{ minHeight:"100vh", background:"#141a12", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16, fontFamily:"sans-serif" }}>
-        <div style={{ fontSize:"3rem" }}>🌾</div>
-        <div style={{ color:"#6aaa7a", fontSize:"1.2rem", fontWeight:700 }}>Chat UI coming in Phase 3!</div>
-        <button onClick={() => setShowChat(false)} style={{ marginTop:8, color:"rgba(232,240,228,0.4)", background:"none", border:"none", cursor:"pointer", fontSize:"0.9rem" }}>
-          ← Back to home
-        </button>
-      </div>
+      <ChatUI
+        user={user}
+        onSignOut={() => { signOut(auth); setShowChat(false); }}
+        onBack={() => setShowChat(false)}
+      />
     );
   }
 
@@ -35,7 +38,7 @@ export default function App() {
     <>
       <Landing
         user={user}
-        onEnter={() => setShowChat(true)}
+        onEnter={handleEnter}
         onLoginClick={() => setShowLogin(true)}
         onSignOut={() => signOut(auth)}
       />
