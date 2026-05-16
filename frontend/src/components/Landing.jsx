@@ -56,7 +56,7 @@ function Particle({ style }) {
   );
 }
 
-export default function Landing({ onEnter }) {
+export default function Landing({ onEnter, onLoginClick }) {
   const [visible, setVisible] = useState(false);
   const [hoveredFeature, setHoveredFeature] = useState(null);
   const [email, setEmail] = useState("");
@@ -417,7 +417,7 @@ export default function Landing({ onEnter }) {
         <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
           <button className="nav-link">Features</button>
           <button className="nav-link">About</button>
-          <button className="login-btn" onClick={() => setShowLogin(true)}>
+          <button className="login-btn" onClick={onLoginClick}>
             Sign in
           </button>
         </div>
@@ -470,7 +470,7 @@ export default function Landing({ onEnter }) {
               Start Chatting
               <span style={{ fontSize: "1.1rem" }}>→</span>
             </button>
-            <button className="login-btn" onClick={() => setShowLogin(true)}>
+            <button className="login-btn" onClick={onLoginClick}>
               Sign in / Register
             </button>
           </div>
