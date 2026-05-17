@@ -17,6 +17,14 @@ const stats = [
   { value: "Free", label: "Always" },
 ];
 
+// Nav feature links shown in dropdown
+const navFeatures = [
+  { icon: "🏪", label: "Mandi Prices", desc: "Live crop prices from markets", path: "/mandi" },
+  { icon: "📋", label: "Schemes & Loans", desc: "Govt schemes you qualify for", path: "/schemes" },
+  { icon: "💬", label: "AI Chat", desc: "Ask anything in EN / HI / KN", path: null, action: "chat" },
+  { icon: "📸", label: "Disease Scanner", desc: "Photo-based crop diagnosis", path: null, action: "chat" },
+];
+
 function Particle({ style }) {
   return <div style={{ position: "absolute", width: 6, height: 6, borderRadius: "50%", background: "rgba(106,170,122,0.35)", ...style }} />;
 }
@@ -25,10 +33,27 @@ export default function Landing({ onEnter, onLoginClick, user, onSignOut }) {
   const navigate = useNavigate();
   const [visible, setVisible] = useState(false);
   const [hoveredFeature, setHoveredFeature] = useState(null);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showFeaturesDropdown, setShowFeaturesDropdown] = useState(false);
+  const featuresRef = useRef(null);
+  const profileRef = useRef(null);
   const canvasRef = useRef(null);
 
   useEffect(() => { setTimeout(() => setVisible(true), 100); }, []);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (featuresRef.current && !featuresRef.current.contains(e.target)) {
+        setShowFeaturesDropdown(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setShowProfileDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -56,12 +81,21 @@ export default function Landing({ onEnter, onLoginClick, user, onSignOut }) {
     animationDelay: `${(i * 0.4) % 3}s`, opacity: 0.4 + (i % 3) * 0.15,
   }));
 
+  const handleNavFeatureClick = (item) => {
+    setShowFeaturesDropdown(false);
+    if (item.path) {
+      navigate(item.path);
+    } else if (item.action === "chat") {
+      onEnter && onEnter();
+    }
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: "#141a12", fontFamily: "'Nunito', sans-serif", color: "#e8f0e4", overflowX: "hidden", position: "relative" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap');
         @keyframes fadeUp { from { opacity:0; transform:translateY(32px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
         @keyframes float0 { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-14px);} }
         @keyframes float1 { 0%,100%{transform:translateY(0) translateX(0);} 50%{transform:translateY(-10px) translateX(8px);} }
         @keyframes float2 { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-18px);} }
@@ -81,15 +115,25 @@ export default function Landing({ onEnter, onLoginClick, user, onSignOut }) {
         .stat-value { font-family:'Sora',sans-serif; font-size:2.4rem; font-weight:800; color:#6aaa7a; line-height:1; }
         .stat-label { font-size:0.82rem; color:rgba(232,240,228,0.5); margin-top:4px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; }
         .orb { position:absolute; border-radius:50%; filter:blur(80px); pointer-events:none; animation:pulse 6s ease-in-out infinite; }
-        .nav-link { color:rgba(232,240,228,0.55); font-weight:600; font-size:0.9rem; cursor:pointer; transition:color 0.15s; background:none; border:none; }
+        .nav-link { color:rgba(232,240,228,0.55); font-weight:600; font-size:0.9rem; cursor:pointer; transition:color 0.15s; background:none; border:none; font-family:'Nunito',sans-serif; }
         .nav-link:hover { color:#8fbc8f; }
+        .nav-link.active { color:#8fbc8f; }
         .badge { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; background:rgba(106,170,122,0.1); border:1px solid rgba(106,170,122,0.2); border-radius:50px; font-size:0.78rem; font-weight:700; color:#8fbc8f; letter-spacing:0.06em; text-transform:uppercase; }
         .whatsapp-pill { display:inline-flex; align-items:center; gap:8px; padding:10px 20px; background:rgba(37,211,102,0.1); border:1px solid rgba(37,211,102,0.25); border-radius:50px; font-size:0.85rem; font-weight:700; color:#25d366; cursor:pointer; transition:all 0.18s; text-decoration:none; }
         .whatsapp-pill:hover { background:rgba(37,211,102,0.18); transform:translateY(-2px); }
         .profile-dropdown { position:absolute; top:calc(100% + 10px); right:0; background:#1c2419; border:1px solid rgba(106,170,122,0.2); border-radius:16px; padding:8px; min-width:200px; box-shadow:0 16px 40px rgba(0,0,0,0.4); animation:fadeIn 0.15s ease; z-index:200; }
-        .dropdown-item { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; cursor:pointer; color:rgba(232,240,228,0.7); font-size:0.88rem; font-weight:600; transition:all 0.15s; background:none; border:none; width:100%; text-align:left; }
+        .features-dropdown { position:absolute; top:calc(100% + 14px); left:50%; transform:translateX(-50%); background:#1a2118; border:1px solid rgba(106,170,122,0.2); border-radius:18px; padding:10px; min-width:260px; box-shadow:0 20px 50px rgba(0,0,0,0.5); animation:fadeIn 0.15s ease; z-index:200; }
+        .features-dropdown::before { content:''; position:absolute; top:-6px; left:50%; transform:translateX(-50%); width:12px; height:12px; background:#1a2118; border-left:1px solid rgba(106,170,122,0.2); border-top:1px solid rgba(106,170,122,0.2); transform:translateX(-50%) rotate(45deg); }
+        .dropdown-item { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; cursor:pointer; color:rgba(232,240,228,0.7); font-size:0.88rem; font-weight:600; transition:all 0.15s; background:none; border:none; width:100%; text-align:left; font-family:'Nunito',sans-serif; }
         .dropdown-item:hover { background:rgba(106,170,122,0.1); color:#e8f0e4; }
         .dropdown-item.danger:hover { background:rgba(239,68,68,0.1); color:#f87171; }
+        .features-dropdown-item { display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border-radius:12px; cursor:pointer; transition:all 0.15s; background:none; border:none; width:100%; text-align:left; font-family:'Nunito',sans-serif; }
+        .features-dropdown-item:hover { background:rgba(106,170,122,0.08); }
+        .features-dropdown-item:hover .fdi-label { color:#e8f0e4; }
+        .fdi-icon { font-size:1.3rem; line-height:1; margin-top:1px; flex-shrink:0; }
+        .fdi-label { color:#b5d6a0; font-weight:700; font-size:0.9rem; margin-bottom:2px; }
+        .fdi-desc { color:rgba(232,240,228,0.4); font-size:0.78rem; font-weight:500; }
+        .features-dropdown-divider { height:1px; background:rgba(106,170,122,0.1); margin:6px 8px; }
       `}</style>
 
       <canvas ref={canvasRef} style={{ position:"fixed", inset:0, width:"100%", height:"100%", pointerEvents:"none", zIndex:99, opacity:0.55 }} />
@@ -100,19 +144,51 @@ export default function Landing({ onEnter, onLoginClick, user, onSignOut }) {
 
       {/* ── NAV ── */}
       <nav style={{ position:"fixed", top:0, left:0, right:0, zIndex:100, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"18px 5%", background:"rgba(20,26,18,0.75)", backdropFilter:"blur(20px)", borderBottom:"1px solid rgba(106,170,122,0.1)" }}>
+        {/* Logo */}
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           <span style={{ fontSize:"1.5rem" }}>🌾</span>
           <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:"1.1rem", color:"#e8f0e4" }}>KrishiBot</span>
         </div>
-        <div style={{ display:"flex", alignItems:"center", gap:24 }}>
-          <button className="nav-link">Features</button>
-          <button className="nav-link">About</button>
-          <button className="nav-link" onClick={() => navigate("/mandi")} style={{ color:"#6aaa7a", fontWeight:700 }}>🏪 Mandi Prices</button>
 
+        {/* Nav links */}
+        <div style={{ display:"flex", alignItems:"center", gap:24 }}>
+
+          {/* Features dropdown */}
+          <div ref={featuresRef} style={{ position:"relative" }}>
+            <button
+              className={`nav-link${showFeaturesDropdown ? " active" : ""}`}
+              onClick={() => setShowFeaturesDropdown(!showFeaturesDropdown)}
+              style={{ display:"flex", alignItems:"center", gap:5 }}
+            >
+              Features
+              <span style={{ fontSize:"0.65rem", opacity:0.6, transition:"transform 0.2s", display:"inline-block", transform: showFeaturesDropdown ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+            </button>
+
+            {showFeaturesDropdown && (
+              <div className="features-dropdown">
+                <div style={{ padding:"6px 10px 8px", borderBottom:"1px solid rgba(106,170,122,0.1)", marginBottom:4 }}>
+                  <div style={{ fontSize:"0.7rem", color:"rgba(232,240,228,0.3)", fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase" }}>KrishiBot Features</div>
+                </div>
+                {navFeatures.map((item, i) => (
+                  <button key={i} className="features-dropdown-item" onClick={() => handleNavFeatureClick(item)}>
+                    <span className="fdi-icon">{item.icon}</span>
+                    <div>
+                      <div className="fdi-label">{item.label}</div>
+                      <div className="fdi-desc">{item.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button className="nav-link">About</button>
+
+          {/* User profile / Sign in */}
           {user ? (
-            <div style={{ position:"relative" }}>
+            <div ref={profileRef} style={{ position:"relative" }}>
               <button
-                onClick={() => setShowDropdown(!showDropdown)}
+                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
                 style={{ display:"flex", alignItems:"center", gap:8, background:"rgba(106,170,122,0.08)", border:"1.5px solid rgba(106,170,122,0.25)", borderRadius:50, padding:"6px 14px 6px 6px", cursor:"pointer", transition:"all 0.18s" }}
               >
                 {user.photoURL ? (
@@ -128,16 +204,16 @@ export default function Landing({ onEnter, onLoginClick, user, onSignOut }) {
                 <span style={{ color:"rgba(181,214,160,0.5)", fontSize:"0.7rem" }}>▼</span>
               </button>
 
-              {showDropdown && (
+              {showProfileDropdown && (
                 <div className="profile-dropdown">
                   <div style={{ padding:"10px 14px 8px", borderBottom:"1px solid rgba(106,170,122,0.1)", marginBottom:4 }}>
                     <div style={{ fontSize:"0.78rem", color:"rgba(232,240,228,0.4)" }}>Signed in as</div>
                     <div style={{ fontSize:"0.85rem", color:"#b5d6a0", fontWeight:700, marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{user.email}</div>
                   </div>
-                  <button className="dropdown-item" onClick={() => { setShowDropdown(false); onEnter && onEnter(); }}>
+                  <button className="dropdown-item" onClick={() => { setShowProfileDropdown(false); onEnter && onEnter(); }}>
                     💬 Start Chatting
                   </button>
-                  <button className="dropdown-item danger" onClick={() => { setShowDropdown(false); onSignOut(); }}>
+                  <button className="dropdown-item danger" onClick={() => { setShowProfileDropdown(false); onSignOut(); }}>
                     🚪 Sign out
                   </button>
                 </div>
@@ -195,7 +271,7 @@ export default function Landing({ onEnter, onLoginClick, user, onSignOut }) {
         </div>
       </section>
 
-      {/* ── FEATURES ── */}
+      {/* ── FEATURES SECTION ── */}
       <section style={{ padding:"80px 5% 100px", maxWidth:1100, margin:"0 auto" }}>
         <div style={{ textAlign:"center", marginBottom:56 }}>
           <div className="badge" style={{ marginBottom:16 }}>What KrishiBot can do</div>

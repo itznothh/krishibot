@@ -7,7 +7,6 @@ import Landing from "./components/Landing";
 import LoginModal from "./components/LoginModal";
 import ChatUI from "./components/ChatUI";
 import Mandi from "./components/Mandi";
-import Schemes from "./components/Schemes";
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -27,13 +26,11 @@ function AppRoutes() {
     setShowChat(true);
   };
 
-  const handleSignOut = () => { signOut(auth); setShowChat(false); };
-
   if (showChat && user) {
     return (
       <ChatUI
         user={user}
-        onSignOut={handleSignOut}
+        onSignOut={() => { signOut(auth); setShowChat(false); }}
         onBack={() => setShowChat(false)}
       />
     );
@@ -53,14 +50,7 @@ function AppRoutes() {
             />
           }
         />
-        <Route
-          path="/mandi"
-          element={<Mandi user={user} onSignOut={handleSignOut} onChatClick={handleEnter} />}
-        />
-        <Route
-          path="/schemes"
-          element={<Schemes user={user} onSignOut={handleSignOut} onChatClick={handleEnter} />}
-        />
+        <Route path="/mandi" element={<Mandi user={user} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
