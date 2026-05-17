@@ -7,6 +7,7 @@ from flask_cors import CORS
 import os
 import json
 import base64
+import requests as req
 
 from modules.weather import get_weather
 from modules.crop_recommender import recommend_crops
@@ -355,6 +356,86 @@ def whatsapp():
         resp = MessagingResponse()
         resp.message("Sorry, something went wrong. Please try again. 🙏")
         return str(resp)
+
+
+# ---------------------------------------------------------------------------
+# Mandi Price Routes (Agmarknet / data.gov.in)
+# ---------------------------------------------------------------------------
+
+AGMARKNET_BASE = "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070"
+AGMARKNET_KEY  = "579b464db66ec23bdd000001cdd3946e44ce4aab0b09b0b94bef91d8"
+
+@app.route('/mandi/markets', methods=['GET'])
+def mandi_markets():
+    state = request.args.get('state', 'Karnataka')
+    try:
+        res = req.get(AGMARKNET_BASE, params={
+            'api-key': AGMARKNET_KEY,
+            'format': 'json',
+            'filters[state]': state,
+            'limit': 200,
+            'fields': 'market',
+        }, timeout=10)
+        data = res.json()
+        records = data.get('records', [])
+        markets = sorted(set(r['market'] for r in records if r.get('market')))
+        return jsonify({'markets': markets})
+    except Exception as e:
+        return jsonify({'markets': [], 'error': str(e)})
+
+
+@app.route('/mandi/prices', methods=['GET'])
+def mandi_prices():
+    state  = request.args.get('state', 'Karnataka')
+    market = request.args.get('market', '')
+    date   = request.args.get('date', '')
+
+    agmark_date = ''
+    if date:
+        try:
+            from datetime import datetime
+            d = datetime.strptime(date, '%Y-%m-%d')
+            agmark_date = d.strftime('%d/%m/%Y')
+        except:
+            pass
+
+    try:
+        params = {
+            'api-key': AGMARKNET_KEY,
+            'format': 'json',
+            'filters[state]': state,
+            'limit': 500,
+        }
+        if market:
+            params['filters[market]'] = market
+        if agmark_date:
+            params['filters[arrival_date]'] = agmark_date
+
+        res = req.get(AGMARKNET_BASE, params=params, timeout=15)
+        data = res.json()
+        records = data.get('records', [])
+
+        prices = []
+        for r in records:
+            try:
+                prices.append({
+                    'commodity':   r.get('commodity', ''),
+                    'variety':     r.get('variety', ''),
+                    'unit':        'quintal',
+                    'min_price':   float(r.get('min_price', 0)),
+                    'max_price':   float(r.get('max_price', 0)),
+                    'modal_price': float(r.get('modal_price', 0)),
+                    'date':        r.get('arrival_date', ''),
+                    'trend':       None,
+                })
+            except:
+                continue
+
+        prices.sort(key=lambda x: x['commodity'])
+        return jsonify({'prices': prices, 'count': len(prices)})
+
+    except Exception as e:
+        return jsonify({'prices': [], 'error': str(e)}), 500
 
 
 if __name__ == '__main__':
