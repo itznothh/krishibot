@@ -359,6 +359,47 @@ def whatsapp():
 
 
 # ---------------------------------------------------------------------------
+# Schemes & Loans Route
+# ---------------------------------------------------------------------------
+
+@app.route('/schemes', methods=['POST'])
+def schemes():
+    try:
+        from groq import Groq
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        prompt = data.get('prompt', '').strip()
+        if not prompt:
+            return jsonify({"error": "No prompt provided"}), 400
+
+        client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+        resp = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=1024,
+            temperature=0.4,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are KrishiBot, an expert on Indian government agricultural schemes, "
+                        "loans, subsidies, and crop insurance. Give accurate, specific, and helpful "
+                        "answers with actual numbers, amounts, and application steps. "
+                        "Always be farmer-friendly and practical."
+                    )
+                },
+                {"role": "user", "content": prompt}
+            ]
+        )
+        text = resp.choices[0].message.content.strip()
+        return jsonify({"result": text})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
 # Mandi Price Routes (Agmarknet / data.gov.in)
 # ---------------------------------------------------------------------------
 

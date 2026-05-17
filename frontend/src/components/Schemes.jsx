@@ -60,17 +60,13 @@ For each scheme include:
 
 Format as clean sections. Be specific with numbers. End with: "📞 Kisan Call Center: 1800-180-1551 (Free, 24x7)"`;
 
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch(`${BACKEND}/schemes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }]
-        })
+        body: JSON.stringify({ prompt })
       });
       const data = await res.json();
-      const text = data.content?.find(b => b.type === "text")?.text || "Could not load schemes. Please try again.";
+      const text = data.result || "Could not load schemes. Please try again.";
       setResult(text);
     } catch {
       setResult("⚠️ Failed to load schemes. Please check your connection and try again.");
@@ -89,17 +85,13 @@ Answer this farmer's question clearly and helpfully: "${query}"
 Include specific numbers, amounts, eligibility, and how to apply where relevant.
 Keep it concise but complete. End with a helpful tip or next step.`;
 
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch(`${BACKEND}/schemes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }]
-        })
+        body: JSON.stringify({ prompt })
       });
       const data = await res.json();
-      const text = data.content?.find(b => b.type === "text")?.text || "Could not answer. Please try again.";
+      const text = data.result || "Could not answer. Please try again.";
       setChatResult(text);
     } catch {
       setChatResult("⚠️ Failed to get answer. Please try again.");
