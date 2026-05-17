@@ -1,6 +1,10 @@
 """
 KrishiBot - Fertilizer Recommendation Module
 """
+import os
+import requests
+
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 FERTILIZER_DATA = {
     "rice": {
@@ -103,7 +107,37 @@ FERTILIZER_DATA = {
     }
 }
 
-def get_fertilizer_advice(message: str) -> str:
+def _translate_via_groq(english_text: str, language: str) -> str:
+    if not GROQ_API_KEY or language == "en":
+        return english_text
+    lang_name = "Hindi" if language == "hi" else "Kannada"
+    enforcement = {
+        "hi": "अंतिम निर्देश: पूरा उत्तर केवल हिंदी में दें।",
+        "kn": "ಅಂತಿಮ ಸೂಚನೆ: ಸಂಪೂರ್ಣ ಉತ್ತರ ಕನ್ನಡದಲ್ಲಿ ನೀಡಿ.",
+    }.get(language, "")
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": f"You are a farming expert. Translate the following fertilizer advice accurately to {lang_name}. Keep chemical names, quantities, and measurements as-is. {enforcement}"},
+                    {"role": "user", "content": english_text}
+                ],
+                "max_tokens": 800,
+                "temperature": 0.3
+            },
+            timeout=20
+        )
+        data = response.json()
+        if "choices" in data:
+            return data["choices"][0]["message"]["content"]
+    except Exception:
+        pass
+    return english_text
+
+def get_fertilizer_advice(message: str, language: str = "en") -> str:
     msg_lower = message.lower()
 
     for crop, data in FERTILIZER_DATA.items():
@@ -116,7 +150,7 @@ def get_fertilizer_advice(message: str) -> str:
                 f"  • **{f['name']}** — {f['amount']}\n    _{f['when']}_"
                 for f in data["organic"]
             ])
-            return (
+            english_response = (
                 f"🧪 **Fertilizer Guide for {crop.capitalize()}**\n\n"
                 f"📊 **Required NPK:** {data['npk']}\n\n"
                 f"⚗️ **Chemical Fertilizers:**\n{chemical_list}\n\n"
@@ -124,10 +158,12 @@ def get_fertilizer_advice(message: str) -> str:
                 f"💡 **Pro Tip:** {data['tip']}\n\n"
                 f"📞 For soil testing: Contact your nearest Krishi Vigyan Kendra (KVK)"
             )
+            return _translate_via_groq(english_response, language)
 
-    return (
+    english_response = (
         f"🧪 I can suggest fertilizers for these crops:\n\n"
         f"Rice 🌾 | Wheat 🌾 | Cotton 🌿 | Maize 🌽 | Tomato 🍅 | Groundnut | Sugarcane\n\n"
         f"Please tell me your **crop name** and I'll give you complete fertilizer guidance!\n\n"
         f"Example: *'fertilizer for wheat'* or *'ganhu ke liye khad'*"
     )
+    return _translate_via_groq(english_response, language)
