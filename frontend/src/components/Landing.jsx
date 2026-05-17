@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 
 const features = [
   { icon: "🌾", title: "Crop Advisor", desc: "Get season & soil-specific crop recommendations instantly." },
@@ -21,6 +22,7 @@ function Particle({ style }) {
 }
 
 export default function Landing({ onEnter, onLoginClick, user, onSignOut }) {
+  const navigate = useNavigate();
   const [visible, setVisible] = useState(false);
   const [hoveredFeature, setHoveredFeature] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -105,6 +107,7 @@ export default function Landing({ onEnter, onLoginClick, user, onSignOut }) {
         <div style={{ display:"flex", alignItems:"center", gap:24 }}>
           <button className="nav-link">Features</button>
           <button className="nav-link">About</button>
+          <button className="nav-link" onClick={() => navigate("/mandi")} style={{ color:"#6aaa7a", fontWeight:700 }}>🏪 Mandi Prices</button>
 
           {user ? (
             <div style={{ position:"relative" }}>
