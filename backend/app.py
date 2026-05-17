@@ -146,6 +146,15 @@ def chat():
         else:
             context['location_status'] = "User has not shared GPS location yet. They can click the 📍 button to share it."
 
+        # ── Language instruction injected into every AI call ───────────────
+        lang_instruction = {
+            'hi': 'IMPORTANT: You must reply entirely in Hindi (Devanagari script). Do not use English except for technical crop/chemical names.',
+            'kn': 'IMPORTANT: You must reply entirely in Kannada script. Do not use English except for technical crop/chemical names.',
+            'en': 'Reply in clear simple English suitable for a farmer.',
+        }
+        context['language'] = language
+        context['language_instruction'] = lang_instruction.get(language, lang_instruction['en'])
+
         intent = classify_intent(message)
 
         if intent == "weather":
@@ -157,11 +166,13 @@ def chat():
                 msg_lower = message.lower()
                 if any(w in msg_lower for w in ['rain', 'barish', 'rainfall', 'chances', 'will it rain']):
                     prompt = (
+                        f"{context['language_instruction']}\n"
                         f"Based on this weather data: {weather_data}, what are the rain chances? "
                         "Give a short 2-3 line farmer-friendly answer."
                     )
                 else:
                     prompt = (
+                        f"{context['language_instruction']}\n"
                         f"Based on this weather data: {weather_data}, give a short 2-3 line "
                         "farmer-friendly tip on how this weather affects farming today "
                         "(e.g. irrigation, spraying, harvesting advice)."
@@ -169,21 +180,26 @@ def chat():
                 weather_data["farming_advice"] = get_ai_response(prompt, context)
                 return jsonify({"status": "weather", "data": weather_data})
             else:
+                no_loc_msg = {
+                    'hi': '📍 कृपया मौसम की जानकारी के लिए अपना स्थान साझा करें।',
+                    'kn': '📍 ಹವಾಮಾನ ಮಾಹಿತಿಗಾಗಿ ದಯವಿಟ್ಟು ನಿಮ್ಮ ಸ್ಥಳವನ್ನು ಹಂಚಿಕೊಳ್ಳಿ.',
+                    'en': '📍 Please share your location to get weather information.',
+                }
                 return jsonify({
                     "status": "needs_location",
-                    "message": "📍 Please share your location to get weather information."
+                    "message": no_loc_msg.get(language, no_loc_msg['en'])
                 })
 
         elif intent == "pest":
-            response = get_pest_advice(message)
+            response = get_pest_advice(message, language=language)
             return jsonify({"status": "pest_advice", "message": response})
 
         elif intent == "crop":
-            response = recommend_crops(message, context)
+            response = recommend_crops(message, context, language=language)
             return jsonify({"status": "crop_advice", "message": response})
 
         elif intent == "fertilizer":
-            response = get_fertilizer_advice(message)
+            response = get_fertilizer_advice(message, language=language)
             return jsonify({"status": "fertilizer", "message": response})
 
         else:
@@ -201,17 +217,32 @@ def chat():
 @app.route('/analyze-image', methods=['POST'])
 def analyze_image():
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "No data provided"}), 400
+        # Accept both FormData (from web app) and JSON (legacy)
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            image_file = request.files.get('image')
+            language   = request.form.get('language', 'en')
+            if not image_file:
+                return jsonify({"error": "No image file provided"}), 400
+            image_bytes  = image_file.read()
+            image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+            mime_type    = image_file.content_type or 'image/jpeg'
+        else:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "No data provided"}), 400
+            image_base64 = data.get('image')
+            mime_type    = data.get('mime_type', 'image/jpeg')
+            language     = data.get('language', 'en')
+            if not image_base64:
+                return jsonify({"error": "No image provided"}), 400
 
-        image_base64 = data.get('image')
-        mime_type = data.get('mime_type', 'image/jpeg')
+        lang_instruction = {
+            'hi': 'IMPORTANT: Reply entirely in Hindi (Devanagari script).',
+            'kn': 'IMPORTANT: Reply entirely in Kannada script.',
+            'en': '',
+        }.get(language, '')
 
-        if not image_base64:
-            return jsonify({"error": "No image provided"}), 400
-
-        result = analyze_crop_image(image_base64, mime_type)
+        result = analyze_crop_image(image_base64, mime_type, lang_instruction=lang_instruction)
         return jsonify({"status": "image_analysis", "message": result})
 
     except Exception as e:
