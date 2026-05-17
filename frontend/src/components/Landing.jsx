@@ -8,11 +8,12 @@ const features = [
   { icon: "🌦️", title: "Weather Alerts", desc: "Real-time hyperlocal weather with farming-specific advice." },
   { icon: "🧪", title: "Fertilizer Guide", desc: "Exact NPK ratios, chemical & organic options per crop." },
   { icon: "💬", title: "3 Languages", desc: "Ask in English, Hindi or Kannada — KrishiBot understands." },
+  { icon: "📊", title: "Yield Estimator", desc: "Enter land size & crop to get expected yield, income & profit estimate." },
 ];
 
 const stats = [
   { value: "3", label: "Languages" },
-  { value: "7+", label: "Crop Modules" },
+  { value: "22+", label: "Crop Modules" },
   { value: "24/7", label: "Available" },
   { value: "Free", label: "Always" },
 ];
@@ -22,6 +23,7 @@ const navFeatures = [
   { icon: "🏪", label: "Mandi Prices", desc: "Live crop prices from markets", path: "/mandi" },
   { icon: "📋", label: "Schemes & Loans", desc: "Govt schemes you qualify for", path: "/schemes" },
   { icon: "💬", label: "AI Chat", desc: "Ask anything in EN / HI / KN", path: null, action: "chat" },
+  { icon: "📊", label: "Yield Estimator", desc: "Estimate income from your crop", path: "/yield" },
   { icon: "📸", label: "Disease Scanner", desc: "Photo-based crop diagnosis", path: null, action: "chat" },
 ];
 
