@@ -10,6 +10,27 @@ const STATES = [
   "Telangana", "Uttar Pradesh", "Uttarakhand", "West Bengal"
 ];
 
+const FALLBACK_MARKETS = {
+  "Karnataka": ["Bangalore","Mysore","Hubli","Belgaum","Mangalore","Davangere","Shimoga","Tumkur","Bijapur","Gulbarga"],
+  "Maharashtra": ["Mumbai","Pune","Nashik","Nagpur","Aurangabad","Solapur","Kolhapur","Ahmednagar"],
+  "Andhra Pradesh": ["Hyderabad","Vijayawada","Visakhapatnam","Guntur","Kurnool","Tirupati","Nellore"],
+  "Tamil Nadu": ["Chennai","Coimbatore","Madurai","Salem","Tiruchirappalli","Tirunelveli","Erode"],
+  "Uttar Pradesh": ["Lucknow","Kanpur","Agra","Varanasi","Allahabad","Meerut","Bareilly"],
+  "Punjab": ["Amritsar","Ludhiana","Jalandhar","Patiala","Bathinda","Mohali"],
+  "Rajasthan": ["Jaipur","Jodhpur","Udaipur","Kota","Ajmer","Bikaner"],
+  "Gujarat": ["Ahmedabad","Surat","Vadodara","Rajkot","Bhavnagar","Jamnagar"],
+  "Madhya Pradesh": ["Bhopal","Indore","Gwalior","Jabalpur","Ujjain","Sagar"],
+  "West Bengal": ["Kolkata","Howrah","Siliguri","Asansol","Durgapur","Bardhaman"],
+  "Delhi": ["Azadpur","Okhla","Shahdara","Narela","Lawrence Road"],
+  "Haryana": ["Gurugram","Faridabad","Panipat","Ambala","Karnal","Rohtak","Hisar"],
+  "Bihar": ["Patna","Gaya","Muzaffarpur","Bhagalpur","Darbhanga"],
+  "Kerala": ["Thiruvananthapuram","Kochi","Kozhikode","Thrissur","Kollam"],
+  "Telangana": ["Hyderabad","Warangal","Nizamabad","Karimnagar","Khammam"],
+  "Odisha": ["Bhubaneswar","Cuttack","Rourkela","Sambalpur","Puri"],
+  "Himachal Pradesh": ["Shimla","Manali","Dharamsala","Solan","Mandi"],
+  "Uttarakhand": ["Dehradun","Haridwar","Roorkee","Haldwani","Nainital"],
+};
+
 const CATEGORIES = ["All", "Vegetables", "Grains", "Fruits", "Pulses"];
 
 const CATEGORY_MAP = {
@@ -56,14 +77,19 @@ export default function Mandi({ user }) {
   }, [mandi, date]);
 
   async function fetchMandis(stateName) {
+    const fallback = FALLBACK_MARKETS[stateName] || ["All Markets"];
     try {
-      const res = await fetch(`${BACKEND}/mandi/markets?state=${encodeURIComponent(stateName)}`);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(`${BACKEND}/mandi/markets?state=${encodeURIComponent(stateName)}`, { signal: controller.signal });
+      clearTimeout(timer);
       const data = await res.json();
-      const list = data.markets || [];
+      const list = data.markets && data.markets.length > 0 ? data.markets : fallback;
       setMandis(list);
       setMandi(list[0] || "");
     } catch {
-      setMandis([]);
+      setMandis(fallback);
+      setMandi(fallback[0] || "");
     }
   }
 
