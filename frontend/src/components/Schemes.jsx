@@ -91,52 +91,56 @@ export default function Schemes({ user, onSignOut, onChatClick }) {
   }
 
   function renderCards(text) {
-    // Parse structured card format: SCHEME/LOAN/PREMIUM/BENEFIT/APPLY/COVERAGE/INTEREST/AMOUNT lines separated by ---
-    const blocks = text.split(/---+/).map(b => b.trim()).filter(Boolean);
-    if (blocks.length <= 1) {
-      // fallback: plain markdown render
-      const html = text
-        .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#b5d6a0">$1</strong>')
-        .replace(/^- (.*)/gm, '<div style="display:flex;gap:8px;margin:4px 0"><span style="color:#6aaa7a">•</span><span>$1</span></div>')
-        .replace(/\n/g, '<br/>');
-      return `<div dangerouslySetInnerHTML` // won't reach here, handled below
-    }
-    return blocks.map(block => {
-      const lines = block.split('\n').filter(l => l.trim());
+    // Split by blank lines or --- to get blocks
+    const blocks = text.split(/\n(?=SCHEME:|LOAN:|PLAN:)/).map(b => b.trim()).filter(Boolean);
+    if (blocks.length === 0) return <div dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }} />;
+    return blocks.map((block, i) => {
+      const lines = block.split('\n').filter(l => l.trim() && !l.startsWith('---'));
       const fields = {};
       lines.forEach(line => {
         const idx = line.indexOf(':');
         if (idx > -1) {
           const key = line.slice(0, idx).trim().toUpperCase();
           const val = line.slice(idx + 1).trim();
-          fields[key] = val;
+          if (key && val) fields[key] = val;
         }
       });
       const title = fields['SCHEME'] || fields['LOAN'] || fields['PLAN'] || lines[0];
-      const rows = Object.entries(fields).filter(([k]) => k !== 'SCHEME' && k !== 'LOAN' && k !== 'PLAN');
       const applyUrl = fields['APPLY'] || '';
       const isUrl = applyUrl.startsWith('http');
-      return (
-        <div key={title} style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(106,170,122,0.15)", borderRadius:14, padding:"18px 20px", marginBottom:12 }}>
-          <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:"1rem", color:"#b5d6a0", marginBottom:10 }}>{title}</div>
-          {rows.map(([k, v]) => (
-            <div key={k} style={{ display:"flex", gap:10, marginBottom:6, fontSize:"0.88rem" }}>
-              <span style={{ color:"rgba(232,240,228,0.4)", fontWeight:700, minWidth:90, textTransform:"capitalize" }}>{k.charAt(0)+k.slice(1).toLowerCase()}</span>
-              {k === 'APPLY' ? (
-                isUrl
-                  ? <a href={v} target="_blank" rel="noopener noreferrer" style={{ color:"#6aaa7a", fontWeight:700, textDecoration:"none" }}>Apply here →</a>
-                  : <span style={{ color:"#e8f0e4" }}>{v}</span>
-              ) : (
-                <span style={{ color:"#e8f0e4" }}>{v}</span>
-              )}
+      const cardContent = (
+        <div style={{ flex:1 }}>
+          <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:"0.95rem", color:"#b5d6a0", marginBottom:10 }}>{title}</div>
+          {Object.entries(fields).filter(([k]) => !['SCHEME','LOAN','PLAN','APPLY'].includes(k)).map(([k, v]) => (
+            <div key={k} style={{ display:"flex", gap:8, marginBottom:5, fontSize:"0.85rem" }}>
+              <span style={{ color:"rgba(232,240,228,0.4)", fontWeight:700, minWidth:80, flexShrink:0, textTransform:"capitalize" }}>{k.charAt(0)+k.slice(1).toLowerCase()}</span>
+              <span style={{ color:"#e8f0e4" }}>{v}</span>
             </div>
           ))}
+          {applyUrl && (
+            <div style={{ marginTop:10, display:"inline-flex", alignItems:"center", gap:6, padding:"6px 14px", background:"rgba(106,170,122,0.12)", border:"1px solid rgba(106,170,122,0.25)", borderRadius:20, fontSize:"0.82rem", fontWeight:700, color:"#6aaa7a" }}>
+              {isUrl ? "Apply Online →" : applyUrl}
+            </div>
+          )}
+        </div>
+      );
+      return isUrl ? (
+        <a key={i} href={applyUrl} target="_blank" rel="noopener noreferrer" style={{ display:"flex", gap:14, background:"rgba(255,255,255,0.03)", border:"1px solid rgba(106,170,122,0.15)", borderRadius:14, padding:"18px 20px", marginBottom:10, textDecoration:"none", cursor:"pointer", transition:"all 0.15s" }}
+          onMouseEnter={e => e.currentTarget.style.borderColor="rgba(106,170,122,0.4)"}
+          onMouseLeave={e => e.currentTarget.style.borderColor="rgba(106,170,122,0.15)"}
+        >
+          {cardContent}
+          <div style={{ fontSize:"1.2rem", alignSelf:"center", opacity:0.4 }}>↗</div>
+        </a>
+      ) : (
+        <div key={i} style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(106,170,122,0.15)", borderRadius:14, padding:"18px 20px", marginBottom:10 }}>
+          {cardContent}
         </div>
       );
     });
   }
 
-  function renderMarkdown(text) {
+    function renderMarkdown(text) {
     return text
       .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#b5d6a0">$1</strong>')
       .replace(/^- (.*)/gm, '<div style="display:flex;gap:8px;margin:4px 0"><span style="color:#6aaa7a">•</span><span>$1</span></div>')
@@ -250,9 +254,7 @@ export default function Schemes({ user, onSignOut, onChatClick }) {
           )}
           {!loading && result && (
             <div className="fade-up" style={{ marginBottom: 28 }}>
-              {result.includes('---') ? renderCards(result) : (
-                <div className="result-box" dangerouslySetInnerHTML={{ __html: renderMarkdown(result) }} />
-              )}
+              {renderCards(result)}
             </div>
           )}
 
