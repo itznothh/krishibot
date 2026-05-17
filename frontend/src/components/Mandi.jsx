@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import Sidebar from "./Sidebar";
 
 const BACKEND = "https://krishibot-api.onrender.com";
 
@@ -71,7 +72,7 @@ function today() {
   return new Date().toISOString().split("T")[0];
 }
 
-export default function Mandi({ user }) {
+export default function Mandi({ user, onSignOut, onChatClick }) {
   const navigate = useNavigate();
   const [state, setState] = useState("Karnataka");
   const [mandi, setMandi] = useState("");
@@ -157,7 +158,9 @@ export default function Mandi({ user }) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0e1510", fontFamily: "'Nunito', sans-serif", color: "#e8f0e4" }}>
+    <div style={{ minHeight: "100vh", background: "#0e1510", fontFamily: "'Nunito', sans-serif", color: "#e8f0e4", display: "flex" }}>
+      <Sidebar user={user} onSignOut={onSignOut} onChatClick={onChatClick} />
+      <div className="sidebar-content" style={{ flex: 1, marginLeft: 220 }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Sora:wght@700;800&display=swap');
         * { box-sizing: border-box; }
@@ -189,15 +192,12 @@ export default function Mandi({ user }) {
         .fade-up { animation: fadeUp 0.3s ease forwards; }
         .shimmer { background: linear-gradient(90deg, rgba(106,170,122,0.05) 25%, rgba(106,170,122,0.1) 50%, rgba(106,170,122,0.05) 75%); background-size: 200% 100%; animation: shimmerAnim 1.2s infinite; border-radius: 6px; }
         @keyframes shimmerAnim { 0%{background-position:200% 0;} 100%{background-position:-200% 0;} }
+        @media (max-width: 700px) { .sidebar-content { margin-left: 0 !important; margin-top: 60px; } }
       `}</style>
 
       {/* ── HEADER ── */}
       <header style={{ background: "rgba(14,21,16,0.9)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(106,170,122,0.12)", padding: "16px 5%", position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <button className="back-btn" onClick={() => navigate("/")}>
-            ← Home
-          </button>
-          <div style={{ width: 1, height: 20, background: "rgba(106,170,122,0.2)" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: "1.3rem" }}>🏪</span>
             <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: "1.05rem", color: "#e8f0e4" }}>Mandi Prices</span>
@@ -342,6 +342,7 @@ export default function Mandi({ user }) {
           </p>
         )}
       </div>
+    </div>
     </div>
   );
 }
