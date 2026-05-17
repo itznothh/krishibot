@@ -5,6 +5,7 @@ const NAV_ITEMS = [
   { path: "/chat",    icon: "💬", label: "Chat" },
   { path: "/mandi",   icon: "🏪", label: "Mandi Prices" },
   { path: "/schemes", icon: "📋", label: "Schemes & Loans" },
+  { path: "/yield",   icon: "📊", label: "Yield Estimator" },
 ];
 
 export default function Sidebar({ user, onSignOut, onChatClick }) {

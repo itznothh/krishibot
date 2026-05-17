@@ -8,6 +8,7 @@ import LoginModal from "./components/LoginModal";
 import ChatUI from "./components/ChatUI";
 import Mandi from "./components/Mandi";
 import Schemes from "./components/Schemes";
+import Yield from "./components/Yield";
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -71,6 +72,16 @@ function AppRoutes() {
           path="/schemes"
           element={
             <Schemes
+              user={user}
+              onSignOut={handleSignOut}
+              onChatClick={handleEnter}
+            />
+          }
+        />
+        <Route
+          path="/yield"
+          element={
+            <Yield
               user={user}
               onSignOut={handleSignOut}
               onChatClick={handleEnter}
