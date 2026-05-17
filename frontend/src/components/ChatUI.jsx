@@ -2,6 +2,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 
 const BACKEND = "https://krishibot-api.onrender.com";
 
+// ── Voice recognition helper ───────────────────────────────────────────────
+const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+
+const LANG_SPEECH_CODE = { en:"en-IN", hi:"hi-IN", kn:"kn-IN" };
+
 const SUGGESTIONS = [
   { icon: "🌾", text: "Which crops to grow this season?" },
   { icon: "🐛", text: "My tomato leaves have yellow spots" },
@@ -216,6 +221,38 @@ export default function ChatUI({ user, onSignOut, onBack }) {
     );
   };
 
+  // ── Voice recognition ───────────────────────────────────────────────────
+  const [listening, setListening] = useState(false);
+  const recognizerRef = useRef(null);
+
+  const toggleVoice = useCallback(() => {
+    if (!SpeechAPI) {
+      alert("Voice recognition is not supported in this browser. Try Chrome.");
+      return;
+    }
+    if (listening) {
+      recognizerRef.current?.stop();
+      setListening(false);
+      return;
+    }
+    const rec = new SpeechAPI();
+    rec.lang = LANG_SPEECH_CODE[lang] || "en-IN";
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.onstart  = () => setListening(true);
+    rec.onend    = () => setListening(false);
+    rec.onerror  = () => setListening(false);
+    rec.onresult = (e) => {
+      const transcript = Array.from(e.results).map(r => r[0].transcript).join("");
+      setInput(transcript);
+      if (e.results[e.results.length - 1].isFinal) {
+        setListening(false);
+      }
+    };
+    recognizerRef.current = rec;
+    rec.start();
+  }, [listening, lang]);
+
   const newChat = () => {
     setMessages([]); setInput(""); setImagePreview(null); setImageFile(null);
     setSidebarOpen(false);
@@ -240,8 +277,10 @@ export default function ChatUI({ user, onSignOut, onBack }) {
           <div style={S.sLabel}>Language</div>
           <div style={{ display:"flex", gap:6, marginTop:8 }}>
             {LANG_OPTIONS.map(l=>(
-              <button key={l.code} onClick={()=>setLang(l.code)}
-                style={{ ...S.langBtn, ...(lang===l.code ? S.langActive : {}) }}>{l.label}</button>
+              <button type="button" key={l.code}
+                className={`krishi-lang-btn${lang===l.code?" active":""}`}
+                onClick={()=>setLang(l.code)}
+                style={S.langBtn}>{l.label}</button>
             ))}
           </div>
         </div>
@@ -296,8 +335,10 @@ export default function ChatUI({ user, onSignOut, onBack }) {
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <div style={{ display:"flex", gap:5 }} className="krishi-lang-desktop">
               {LANG_OPTIONS.map(l=>(
-                <button key={l.code} onClick={()=>setLang(l.code)}
-                  style={{ ...S.langBtn, ...(lang===l.code?S.langActive:{}) }}>{l.label}</button>
+                <button type="button" key={l.code}
+                  className={`krishi-lang-btn${lang===l.code?" active":""}`}
+                  onClick={()=>setLang(l.code)}
+                  style={S.langBtn}>{l.label}</button>
               ))}
             </div>
             {onBack && <button style={S.backBtn} onClick={onBack}>← Home</button>}
@@ -364,11 +405,24 @@ export default function ChatUI({ user, onSignOut, onBack }) {
               value={input}
               onChange={e=>setInput(e.target.value)}
               onKeyDown={handleKey}
-              placeholder="Ask in English, Hindi or Kannada…"
+              placeholder={listening ? "🎙 Listening…" : "Ask in English, Hindi or Kannada…"}
               rows={1}
-              style={S.textarea}
+              style={{ ...S.textarea, ...(listening ? { color:"#6aaa7a" } : {}) }}
               onInput={e=>{ e.target.style.height="auto"; e.target.style.height=Math.min(e.target.scrollHeight,120)+"px"; }}
             />
+            {/* Mic button */}
+            {SpeechAPI && (
+              <button type="button"
+                style={{ ...S.iBtn, color: listening ? "#f87171" : "rgba(232,240,228,0.3)", position:"relative" }}
+                onClick={toggleVoice}
+                title={listening ? "Stop listening" : "Speak your question"}>
+                {listening
+                  ? <svg width="18" height="18" viewBox="0 0 24 24" fill="#f87171" stroke="#f87171" strokeWidth="1"><rect x="9" y="9" width="6" height="6" rx="1"/><path fill="none" strokeWidth="2" d="M12 1a3 3 0 0 1 3 3v4a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path fill="none" strokeWidth="2" d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                  : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 1 3 3v4a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                }
+                {listening && <span style={S.micPulse}/>}
+              </button>
+            )}
             <button style={{ ...S.sendBtn, opacity:(input.trim()||imageFile)&&!loading?1:0.4 }}
               onClick={handleSend} disabled={loading||(!input.trim()&&!imageFile)} className="krishi-send">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -425,6 +479,7 @@ const S = {
   newChatBtn: { width:"100%", background:"linear-gradient(135deg,rgba(74,124,89,0.32),rgba(106,170,122,0.18))", border:"1px solid rgba(106,170,122,0.28)", color:"#b5d6a0", fontSize:"0.84rem", fontWeight:800, borderRadius:11, padding:"9px 13px", cursor:"pointer", fontFamily:"'Nunito',sans-serif", display:"flex", alignItems:"center", gap:7 },
   histItem:   { padding:"8px 11px", borderRadius:9, color:"rgba(232,240,228,0.4)", fontSize:"0.81rem", fontWeight:600, cursor:"pointer", marginTop:4, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" },
   histActive: { background:"rgba(106,170,122,0.1)", color:"#b5d6a0" },
+  micPulse:   { position:"absolute", inset:0, borderRadius:"50%", border:"2px solid #f87171", animation:"krishiMicPulse 1s ease-out infinite", pointerEvents:"none" },
   avatarFb:   { width:32, height:32, borderRadius:"50%", background:"linear-gradient(135deg,#3a6b47,#6aaa7a)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:800, fontSize:"0.84rem", cursor:"pointer", flexShrink:0 },
 };
 
@@ -436,12 +491,28 @@ const CSS = `
     0%,80%,100% { transform:translateY(0); opacity:0.35; }
     40%          { transform:translateY(-6px); opacity:1; }
   }
+  @keyframes krishiMicPulse {
+    0%   { opacity:0.8; transform:scale(1); }
+    100% { opacity:0;   transform:scale(1.9); }
+  }
+
   .krishi-dots { display:flex; gap:5px; align-items:center; height:16px; }
   .krishi-dots span { display:inline-block; width:7px; height:7px; border-radius:50%; background:rgba(106,170,122,0.75); animation:krishiDot 1.2s ease-in-out infinite; }
   .krishi-dots span:nth-child(2) { animation-delay:0.18s; }
   .krishi-dots span:nth-child(3) { animation-delay:0.36s; }
 
-  .krishi-send:hover:not(:disabled) { transform:scale(1.1); opacity:1 !important; }
+  .krishi-send:hover:not(:disabled) { transform:scale(1.1) !important; opacity:1 !important; }
+
+  /* lang buttons — active state must win over hover */
+  .krishi-lang-btn { transition: background 0.15s, border-color 0.15s, color 0.15s; }
+  .krishi-lang-btn:hover { opacity:1 !important; background:rgba(106,170,122,0.1); }
+  .krishi-lang-btn.active {
+    background: rgba(106,170,122,0.22) !important;
+    border-color: rgba(106,170,122,0.55) !important;
+    color: #b5d6a0 !important;
+    box-shadow: 0 0 0 1px rgba(106,170,122,0.3);
+  }
+
   textarea::placeholder { color:rgba(232,240,228,0.26); }
   textarea::-webkit-scrollbar { display:none; }
   ::-webkit-scrollbar { width:4px; }
