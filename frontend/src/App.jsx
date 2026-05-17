@@ -7,6 +7,7 @@ import Landing from "./components/Landing";
 import LoginModal from "./components/LoginModal";
 import ChatUI from "./components/ChatUI";
 import Mandi from "./components/Mandi";
+import Schemes from "./components/Schemes";
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -26,11 +27,17 @@ function AppRoutes() {
     setShowChat(true);
   };
 
+  const handleSignOut = () => {
+    signOut(auth);
+    setShowChat(false);
+  };
+
+  // Chat renders as a full-screen overlay — doesn't break routing
   if (showChat && user) {
     return (
       <ChatUI
         user={user}
-        onSignOut={() => { signOut(auth); setShowChat(false); }}
+        onSignOut={handleSignOut}
         onBack={() => setShowChat(false)}
       />
     );
@@ -46,11 +53,30 @@ function AppRoutes() {
               user={user}
               onEnter={handleEnter}
               onLoginClick={() => setShowLogin(true)}
-              onSignOut={() => signOut(auth)}
+              onSignOut={handleSignOut}
             />
           }
         />
-        <Route path="/mandi" element={<Mandi user={user} />} />
+        <Route
+          path="/mandi"
+          element={
+            <Mandi
+              user={user}
+              onSignOut={handleSignOut}
+              onChatClick={handleEnter}
+            />
+          }
+        />
+        <Route
+          path="/schemes"
+          element={
+            <Schemes
+              user={user}
+              onSignOut={handleSignOut}
+              onChatClick={handleEnter}
+            />
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
