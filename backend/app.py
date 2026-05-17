@@ -396,7 +396,8 @@ def schemes():
         return jsonify({"result": text})
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 
 # ---------------------------------------------------------------------------
