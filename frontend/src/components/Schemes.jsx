@@ -37,37 +37,32 @@ export default function Schemes({ user, onSignOut, onChatClick }) {
   const [chatResult, setChatResult] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
 
+  function buildPrompt() {
+    const farmer = `Farmer: ${state}, grows ${crop}, land: ${landSize}.`;
+    if (activeTab === "schemes") {
+      return `${farmer}\n\nList the top 5 government schemes this farmer qualifies for. For EACH scheme use EXACTLY this format:\n\nSCHEME: [Name]\nBENEFIT: [Amount or subsidy — one line]\nAPPLY: [Website URL]\n---\n\nOnly include central + ${state} state schemes. No paragraphs. Specific rupee amounts only.`;
+    }
+    if (activeTab === "loans") {
+      return `${farmer}\n\nList the top 4 agricultural loan options for this farmer. For EACH use EXACTLY this format:\n\nLOAN: [Name]\nAMOUNT: [Max loan amount]\nINTEREST: [Rate per year]\nAPPLY: [Bank name or website]\n---\n\nInclude Kisan Credit Card. No paragraphs. Specific numbers only.`;
+    }
+    if (activeTab === "insurance") {
+      return `${farmer}\n\nList crop insurance options for ${crop} in ${state}. For EACH use EXACTLY this format:\n\nSCHEME: [Name]\nPREMIUM: [% farmer pays]\nCOVERAGE: [What is covered — one line]\nAPPLY: [Website or enrollment method]\n---\n\nInclude PMFBY. No paragraphs. Specific numbers only.`;
+    }
+    return farmer;
+  }
+
   async function fetchSchemes() {
     setLoading(true);
     setResult(null);
     try {
-      const prompt = `You are KrishiBot, an expert on Indian government agricultural schemes.
-A farmer from ${state} grows ${crop} on ${landSize} of land.
-
-List ALL relevant government schemes, subsidies, and benefits they qualify for. Include:
-1. **PM-KISAN** — eligibility & amount
-2. **PMFBY (Crop Insurance)** — premium %, coverage, how to apply
-3. **Kisan Credit Card** — loan limit, interest rate
-4. **State-specific schemes for ${state}**
-5. **Soil Health Card scheme**
-6. Any other relevant central/state schemes for ${crop} farmers
-
-For each scheme include:
-- What it is (1 line)
-- Benefit amount / subsidy %
-- How to apply (portal or office)
-- Key eligibility criteria
-
-Format as clean sections. Be specific with numbers. End with: "📞 Kisan Call Center: 1800-180-1551 (Free, 24x7)"`;
-
+      const prompt = buildPrompt();
       const res = await fetch(`${BACKEND}/schemes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt })
       });
       const data = await res.json();
-      const text = data.result || "Could not load schemes. Please try again.";
-      setResult(text);
+      setResult(data.result || "Could not load schemes. Please try again.");
     } catch {
       setResult("⚠️ Failed to load schemes. Please check your connection and try again.");
     }
@@ -80,19 +75,14 @@ Format as clean sections. Be specific with numbers. End with: "📞 Kisan Call C
     setChatLoading(true);
     setChatResult(null);
     try {
-      const prompt = `You are KrishiBot, an expert on Indian agricultural schemes, loans, and insurance.
-Answer this farmer's question clearly and helpfully: "${query}"
-Include specific numbers, amounts, eligibility, and how to apply where relevant.
-Keep it concise but complete. End with a helpful tip or next step.`;
-
+      const prompt = `Answer this farmer's question briefly and practically: "${query}"\nGive key facts only: amounts, eligibility, and where to apply. Max 5 lines.`;
       const res = await fetch(`${BACKEND}/schemes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt })
       });
       const data = await res.json();
-      const text = data.result || "Could not answer. Please try again.";
-      setChatResult(text);
+      setChatResult(data.result || "Could not answer. Please try again.");
     } catch {
       setChatResult("⚠️ Failed to get answer. Please try again.");
     }
@@ -100,13 +90,56 @@ Keep it concise but complete. End with a helpful tip or next step.`;
     setQuestion("");
   }
 
+  function renderCards(text) {
+    // Parse structured card format: SCHEME/LOAN/PREMIUM/BENEFIT/APPLY/COVERAGE/INTEREST/AMOUNT lines separated by ---
+    const blocks = text.split(/---+/).map(b => b.trim()).filter(Boolean);
+    if (blocks.length <= 1) {
+      // fallback: plain markdown render
+      const html = text
+        .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#b5d6a0">$1</strong>')
+        .replace(/^- (.*)/gm, '<div style="display:flex;gap:8px;margin:4px 0"><span style="color:#6aaa7a">•</span><span>$1</span></div>')
+        .replace(/\n/g, '<br/>');
+      return `<div dangerouslySetInnerHTML` // won't reach here, handled below
+    }
+    return blocks.map(block => {
+      const lines = block.split('\n').filter(l => l.trim());
+      const fields = {};
+      lines.forEach(line => {
+        const idx = line.indexOf(':');
+        if (idx > -1) {
+          const key = line.slice(0, idx).trim().toUpperCase();
+          const val = line.slice(idx + 1).trim();
+          fields[key] = val;
+        }
+      });
+      const title = fields['SCHEME'] || fields['LOAN'] || fields['PLAN'] || lines[0];
+      const rows = Object.entries(fields).filter(([k]) => k !== 'SCHEME' && k !== 'LOAN' && k !== 'PLAN');
+      const applyUrl = fields['APPLY'] || '';
+      const isUrl = applyUrl.startsWith('http');
+      return (
+        <div key={title} style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(106,170,122,0.15)", borderRadius:14, padding:"18px 20px", marginBottom:12 }}>
+          <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:"1rem", color:"#b5d6a0", marginBottom:10 }}>{title}</div>
+          {rows.map(([k, v]) => (
+            <div key={k} style={{ display:"flex", gap:10, marginBottom:6, fontSize:"0.88rem" }}>
+              <span style={{ color:"rgba(232,240,228,0.4)", fontWeight:700, minWidth:90, textTransform:"capitalize" }}>{k.charAt(0)+k.slice(1).toLowerCase()}</span>
+              {k === 'APPLY' ? (
+                isUrl
+                  ? <a href={v} target="_blank" rel="noopener noreferrer" style={{ color:"#6aaa7a", fontWeight:700, textDecoration:"none" }}>Apply here →</a>
+                  : <span style={{ color:"#e8f0e4" }}>{v}</span>
+              ) : (
+                <span style={{ color:"#e8f0e4" }}>{v}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    });
+  }
+
   function renderMarkdown(text) {
     return text
       .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#b5d6a0">$1</strong>')
-      .replace(/^### (.*)/gm, '<h3 style="color:#6aaa7a;font-size:1rem;margin:20px 0 8px;font-family:Sora,sans-serif">$1</h3>')
-      .replace(/^## (.*)/gm, '<h2 style="color:#8fbc8f;font-size:1.1rem;margin:24px 0 10px;font-family:Sora,sans-serif">$1</h2>')
       .replace(/^- (.*)/gm, '<div style="display:flex;gap:8px;margin:4px 0"><span style="color:#6aaa7a">•</span><span>$1</span></div>')
-      .replace(/\n\n/g, '<br/><br/>')
       .replace(/\n/g, '<br/>');
   }
 
@@ -216,8 +249,10 @@ Keep it concise but complete. End with a helpful tip or next step.`;
             </div>
           )}
           {!loading && result && (
-            <div className="result-box fade-up" style={{ marginBottom: 28 }}>
-              <div dangerouslySetInnerHTML={{ __html: renderMarkdown(result) }} />
+            <div className="fade-up" style={{ marginBottom: 28 }}>
+              {result.includes('---') ? renderCards(result) : (
+                <div className="result-box" dangerouslySetInnerHTML={{ __html: renderMarkdown(result) }} />
+              )}
             </div>
           )}
 
