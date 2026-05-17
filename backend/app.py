@@ -373,9 +373,8 @@ def mandi_markets():
             'api-key': AGMARKNET_KEY,
             'format': 'json',
             'filters[state]': state,
-            'limit': 200,
-            'fields': 'market',
-        }, timeout=10)
+            'limit': 500,
+        }, timeout=30)
         data = res.json()
         records = data.get('records', [])
         markets = sorted(set(r['market'] for r in records if r.get('market')))
@@ -411,7 +410,7 @@ def mandi_prices():
         if agmark_date:
             params['filters[arrival_date]'] = agmark_date
 
-        res = req.get(AGMARKNET_BASE, params=params, timeout=15)
+        res = req.get(AGMARKNET_BASE, params=params, timeout=30)
         data = res.json()
         records = data.get('records', [])
 
