@@ -10,6 +10,24 @@ const STATES = [
   "Telangana", "Uttar Pradesh", "Uttarakhand", "West Bengal"
 ];
 
+const FALLBACK_PRICES = [
+  { commodity: 'Tomato',     variety: 'Local',   unit: 'quintal', min_price: 800,  modal_price: 1200, max_price: 1600, trend: 5.2  },
+  { commodity: 'Onion',      variety: 'Red',     unit: 'quintal', min_price: 1200, modal_price: 1500, max_price: 1900, trend: -2.1 },
+  { commodity: 'Potato',     variety: 'Jyoti',   unit: 'quintal', min_price: 600,  modal_price: 800,  max_price: 1000, trend: 0    },
+  { commodity: 'Wheat',      variety: 'Lokwan',  unit: 'quintal', min_price: 2100, modal_price: 2200, max_price: 2300, trend: 1.5  },
+  { commodity: 'Rice',       variety: 'Sona',    unit: 'quintal', min_price: 2800, modal_price: 3200, max_price: 3600, trend: 3.0  },
+  { commodity: 'Maize',      variety: 'Yellow',  unit: 'quintal', min_price: 1600, modal_price: 1800, max_price: 2000, trend: -1.0 },
+  { commodity: 'Banana',     variety: 'Robusta', unit: 'quintal', min_price: 1000, modal_price: 1400, max_price: 1800, trend: 2.3  },
+  { commodity: 'Chickpea',   variety: 'Desi',    unit: 'quintal', min_price: 4800, modal_price: 5200, max_price: 5600, trend: 0.8  },
+  { commodity: 'Chilli',     variety: 'Dry',     unit: 'quintal', min_price: 8000, modal_price: 9500, max_price: 11000,trend: 4.1  },
+  { commodity: 'Soybean',    variety: 'Yellow',  unit: 'quintal', min_price: 3800, modal_price: 4200, max_price: 4600, trend: -0.5 },
+  { commodity: 'Brinjal',    variety: 'Local',   unit: 'quintal', min_price: 400,  modal_price: 700,  max_price: 1000, trend: null },
+  { commodity: 'Cauliflower',variety: 'Local',   unit: 'quintal', min_price: 500,  modal_price: 900,  max_price: 1200, trend: null },
+  { commodity: 'Moong',      variety: 'Green',   unit: 'quintal', min_price: 6000, modal_price: 6800, max_price: 7500, trend: 1.2  },
+  { commodity: 'Lentil',     variety: 'Masoor',  unit: 'quintal', min_price: 5200, modal_price: 5800, max_price: 6400, trend: 0.3  },
+  { commodity: 'Mango',      variety: 'Alphonso',unit: 'quintal', min_price: 4000, modal_price: 6000, max_price: 8000, trend: 6.0  },
+];
+
 const FALLBACK_MARKETS = {
   "Karnataka": ["Bangalore","Mysore","Hubli","Belgaum","Mangalore","Davangere","Shimoga","Tumkur","Bijapur","Gulbarga"],
   "Maharashtra": ["Mumbai","Pune","Nashik","Nagpur","Aurangabad","Solapur","Kolhapur","Ahmednagar"],
@@ -97,16 +115,23 @@ export default function Mandi({ user }) {
     setLoading(true);
     setError(null);
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
       const res = await fetch(
-        `${BACKEND}/mandi/prices?state=${encodeURIComponent(state)}&market=${encodeURIComponent(mandi)}&date=${date}`
+        `${BACKEND}/mandi/prices?state=${encodeURIComponent(state)}&market=${encodeURIComponent(mandi)}&date=${date}`,
+        { signal: controller.signal }
       );
+      clearTimeout(timer);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setPrices(data.prices || []);
-      setLastUpdated(new Date().toLocaleTimeString());
+      const list = data.prices && data.prices.length > 0 ? data.prices : FALLBACK_PRICES;
+      setPrices(list);
+      setLastUpdated(new Date().toLocaleTimeString() + (data.prices?.length > 0 ? "" : " (sample data)"));
     } catch (e) {
-      setError(e.message || "Could not fetch prices. Try again.");
-      setPrices([]);
+      // Always show fallback — never a blank error screen
+      setPrices(FALLBACK_PRICES);
+      setLastUpdated(new Date().toLocaleTimeString() + " (sample data)");
+      setError(null);
     }
     setLoading(false);
   }
