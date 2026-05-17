@@ -365,7 +365,6 @@ def whatsapp():
 @app.route('/schemes', methods=['POST'])
 def schemes():
     try:
-        from groq import Groq
         data = request.get_json()
         if not data:
             return jsonify({"error": "No data provided"}), 400
@@ -374,30 +373,44 @@ def schemes():
         if not prompt:
             return jsonify({"error": "No prompt provided"}), 400
 
-        client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
-        resp = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            max_tokens=1024,
-            temperature=0.4,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are KrishiBot, an expert on Indian government agricultural schemes, "
-                        "loans, subsidies, and crop insurance. Give accurate, specific, and helpful "
-                        "answers with actual numbers, amounts, and application steps. "
-                        "Always be farmer-friendly and practical."
-                    )
-                },
-                {"role": "user", "content": prompt}
-            ]
+        groq_key = os.environ.get("GROQ_API_KEY", "")
+        if not groq_key:
+            return jsonify({"error": "GROQ_API_KEY not set"}), 500
+
+        response = req.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {groq_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are KrishiBot, an expert on Indian government agricultural schemes, "
+                            "loans, subsidies, and crop insurance. Give accurate, specific, and helpful "
+                            "answers with actual numbers, amounts, and application steps. "
+                            "Always be farmer-friendly and practical."
+                        )
+                    },
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 1024,
+                "temperature": 0.4
+            },
+            timeout=30
         )
-        text = resp.choices[0].message.content.strip()
-        return jsonify({"result": text})
+        result = response.json()
+        if "choices" in result:
+            text = result["choices"][0]["message"]["content"]
+            return jsonify({"result": text})
+        else:
+            return jsonify({"error": result.get("error", {}).get("message", "Unknown error")}), 500
 
     except Exception as e:
-        import traceback
-        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 # ---------------------------------------------------------------------------
