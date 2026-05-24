@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
 
 const BACKEND = "https://krishibot-api.onrender.com";
 
@@ -114,7 +115,26 @@ function Message({ msg }) {
           <img src={msg.imageUrl} alt="crop" style={{ maxWidth:180, borderRadius:12, border:"1px solid rgba(106,170,122,0.2)" }} />
         )}
         {msg.text && (
-          <div style={isUser ? S.userBubble : S.botBubble}>{msg.text}</div>
+          <div style={isUser ? S.userBubble : S.botBubble}>
+            {isUser ? msg.text : (
+              <ReactMarkdown
+                components={{
+                  p: ({children}) => <p style={{ margin:"0 0 6px" }}>{children}</p>,
+                  strong: ({children}) => <strong style={{ color:"#b5d6a0", fontWeight:700 }}>{children}</strong>,
+                  ul: ({children}) => <ul style={{ paddingLeft:18, margin:"4px 0" }}>{children}</ul>,
+                  ol: ({children}) => <ol style={{ paddingLeft:18, margin:"4px 0" }}>{children}</ol>,
+                  li: ({children}) => <li style={{ marginBottom:3 }}>{children}</li>,
+                  h1: ({children}) => <h1 style={{ fontSize:"1rem", color:"#b5d6a0", fontWeight:700, margin:"8px 0 4px" }}>{children}</h1>,
+                  h2: ({children}) => <h2 style={{ fontSize:"0.95rem", color:"#b5d6a0", fontWeight:700, margin:"8px 0 4px" }}>{children}</h2>,
+                  h3: ({children}) => <h3 style={{ fontSize:"0.9rem", color:"#8fbc8f", fontWeight:700, margin:"6px 0 3px" }}>{children}</h3>,
+                  code: ({children}) => <code style={{ background:"rgba(106,170,122,0.12)", borderRadius:4, padding:"1px 5px", fontSize:"0.85em", color:"#b5d6a0" }}>{children}</code>,
+                  hr: () => <hr style={{ border:"none", borderTop:"1px solid rgba(106,170,122,0.15)", margin:"8px 0" }}/>,
+                }}
+              >
+                {msg.text}
+              </ReactMarkdown>
+            )}
+          </div>
         )}
         {msg.status==="weather"    && msg.data && <WeatherCard data={msg.data}/>}
         {msg.status==="crop"       && msg.data && <CropCard data={msg.data}/>}
