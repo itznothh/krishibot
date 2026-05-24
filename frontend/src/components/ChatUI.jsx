@@ -410,19 +410,17 @@ export default function ChatUI({ user, onSignOut, onBack }) {
               style={{ ...S.textarea, ...(listening ? { color:"#6aaa7a" } : {}) }}
               onInput={e=>{ e.target.style.height="auto"; e.target.style.height=Math.min(e.target.scrollHeight,120)+"px"; }}
             />
-            {/* Mic button */}
-            {SpeechAPI && (
-              <button type="button"
-                style={{ ...S.iBtn, color: listening ? "#f87171" : "rgba(232,240,228,0.3)", position:"relative" }}
-                onClick={toggleVoice}
-                title={listening ? "Stop listening" : "Speak your question"}>
-                {listening
-                  ? <svg width="18" height="18" viewBox="0 0 24 24" fill="#f87171" stroke="#f87171" strokeWidth="1"><rect x="9" y="9" width="6" height="6" rx="1"/><path fill="none" strokeWidth="2" d="M12 1a3 3 0 0 1 3 3v4a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path fill="none" strokeWidth="2" d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-                  : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 1 3 3v4a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-                }
-                {listening && <span style={S.micPulse}/>}
-              </button>
-            )}
+            {/* Mic button — always visible */}
+            <button type="button"
+              style={{ ...S.iBtn, color: listening ? "#f87171" : SpeechAPI ? "rgba(232,240,228,0.3)" : "rgba(232,240,228,0.15)", position:"relative" }}
+              onClick={toggleVoice}
+              title={!SpeechAPI ? "Voice not supported — use Chrome" : listening ? "Stop listening" : "Speak your question"}>
+              {listening
+                ? <svg width="18" height="18" viewBox="0 0 24 24" fill="#f87171" stroke="#f87171" strokeWidth="1"><rect x="9" y="9" width="6" height="6" rx="1"/><path fill="none" strokeWidth="2" d="M12 1a3 3 0 0 1 3 3v4a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path fill="none" strokeWidth="2" d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 1 3 3v4a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              }
+              {listening && <span style={S.micPulse}/>}
+            </button>
             <button style={{ ...S.sendBtn, opacity:(input.trim()||imageFile)&&!loading?1:0.4 }}
               onClick={handleSend} disabled={loading||(!input.trim()&&!imageFile)} className="krishi-send">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

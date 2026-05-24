@@ -243,7 +243,7 @@ def analyze_image():
             'en': '',
         }.get(language, '')
 
-        result = analyze_crop_image(image_base64, mime_type, lang_instruction=lang_instruction)
+        result = analyze_crop_image(image_base64, mime_type)
         return jsonify({"status": "image_analysis", "message": result})
 
     except Exception as e:
