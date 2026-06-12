@@ -173,14 +173,25 @@ function StructuredBotMessage({ text }) {
       {/* Intro text */}
       {intro.length > 0 && (
         <div style={S.botBubble}>
-          {intro.map((line, i) =>
-            line.type === "bullet"
-              ? <div key={i} style={{ display:"flex", gap:7, alignItems:"flex-start", marginBottom:3 }}>
-                  <span style={{ color:"#6aaa7a", marginTop:2, flexShrink:0 }}>•</span>
-                  <span style={{ color:"#e8f0e4", fontSize:"0.89rem" }}>{line.content}</span>
+          {intro.map((line, i) => {
+            if (line.type === "bullet") {
+              const colonIdx = line.content.indexOf(":");
+              const hasDesc = colonIdx > 0 && colonIdx < 40;
+              const name = hasDesc ? line.content.slice(0, colonIdx).trim() : line.content;
+              const desc = hasDesc ? line.content.slice(colonIdx + 1).trim() : null;
+              return (
+                <div key={i} style={{ display:"flex", gap:7, alignItems:"flex-start", marginBottom:6 }}>
+                  <span style={{ color:"#6aaa7a", marginTop:5, flexShrink:0, fontSize:"0.6rem" }}>●</span>
+                  <span style={{ fontSize:"0.89rem", lineHeight:1.5 }}>
+                    {hasDesc ? <><span style={{ fontWeight:700, color:"#e8f0e4" }}>{name}</span><span style={{ color:"rgba(232,240,228,0.65)" }}>: {desc}</span></> : <span style={{ color:"#e8f0e4" }}>{line.content}</span>}
+                  </span>
                 </div>
-              : <p key={i} style={{ margin:"0 0 5px", fontSize:"0.89rem", color: line.type==="note" ? "rgba(232,240,228,0.55)" : "#e8f0e4" }}>{line.content}</p>
-          )}
+              );
+            }
+            return (
+              <p key={i} style={{ margin:"0 0 8px", fontSize:"0.89rem", lineHeight:1.5, color: line.type==="note" ? "rgba(232,240,228,0.55)" : "#e8f0e4" }}>{line.content}</p>
+            );
+          })}
         </div>
       )}
 
@@ -219,9 +230,9 @@ function StructuredBotMessage({ text }) {
 
               {/* Notes / sub-text */}
               {sec.notes.length > 0 && (
-                <div style={{ marginTop: sec.items.length ? 8 : 10, display:"flex", flexDirection:"column", gap:4 }}>
+                <div style={{ marginTop: sec.items.length ? 8 : 6, display:"flex", flexDirection:"column", gap:6 }}>
                   {sec.notes.map((n, ni) => (
-                    <p key={ni} style={{ fontSize:"0.82rem", color:"rgba(232,240,228,0.5)", margin:0, lineHeight:1.5 }}>{n}</p>
+                    <p key={ni} style={{ fontSize:"0.84rem", color:"rgba(232,240,228,0.75)", margin:0, lineHeight:1.55 }}>{n}</p>
                   ))}
                 </div>
               )}
