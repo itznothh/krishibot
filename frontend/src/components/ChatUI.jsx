@@ -103,6 +103,136 @@ function ImageResultCard({ data }) {
   );
 }
 
+// ── Structured bot message renderer ───────────────────────────────────────
+
+const SECTION_ICONS = {
+  "warm": "☀️", "dry": "🌵", "cool": "❄️", "wet": "🌧️",
+  "crop": "🌾", "fertilizer": "🧪", "soil": "🪴", "water": "💧",
+  "pest": "🐛", "disease": "🦠", "weather": "🌦️", "rain": "🌧️",
+  "general": "📋", "tip": "💡", "warning": "⚠️", "note": "📝",
+};
+
+function getSectionIcon(heading) {
+  const h = heading.toLowerCase();
+  for (const [key, icon] of Object.entries(SECTION_ICONS)) {
+    if (h.includes(key)) return icon;
+  }
+  return "🌱";
+}
+
+// Parses markdown text into sections: { heading, items[], intro }
+function parseIntoSections(text) {
+  const lines = text.split("\n");
+  const sections = [];
+  let intro = [];
+  let current = null;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+
+    // Heading line (## or **text**: or "For X climates:")
+    const h2 = line.match(/^#{1,3}\s+(.+)/);
+    const boldLabel = line.match(/^\*\*(.+?)\*\*:?\s*$/);
+    const forLabel = line.match(/^(For .+?):?\s*$/i);
+
+    if (h2 || boldLabel || forLabel) {
+      if (current) sections.push(current);
+      current = { heading: (h2?.[1] || boldLabel?.[1] || forLabel?.[1]).replace(/\*\*/g,""), items: [], notes: [] };
+    } else if (line.match(/^[-*]\s+/) || line.match(/^\d+\.\s+/)) {
+      // Bullet or numbered item
+      const content = line.replace(/^[-*\d.]+\s+/, "").replace(/\*\*/g, "");
+      if (current) current.items.push(content);
+      else intro.push({ type:"bullet", content });
+    } else if (line.match(/^\*\*(.+?)\*\*:?\s*.+/)) {
+      // Bold-prefixed line e.g. **Cereals:** Paddy, Maize, Bajra
+      const content = line.replace(/\*\*/g, "");
+      if (current) current.items.push(content);
+      else intro.push({ type:"bullet", content });
+    } else if (line.startsWith(">")) {
+      const content = line.replace(/^>\s*/, "");
+      if (current) current.notes.push(content);
+      else intro.push({ type:"note", content });
+    } else {
+      // Plain paragraph
+      const content = line.replace(/\*\*/g, "");
+      if (current) current.notes.push(content);
+      else intro.push({ type:"text", content });
+    }
+  }
+  if (current) sections.push(current);
+  return { intro, sections };
+}
+
+function StructuredBotMessage({ text }) {
+  const { intro, sections } = parseIntoSections(text);
+  const hasSections = sections.length > 0;
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:8, maxWidth:"100%" }}>
+      {/* Intro text */}
+      {intro.length > 0 && (
+        <div style={S.botBubble}>
+          {intro.map((line, i) =>
+            line.type === "bullet"
+              ? <div key={i} style={{ display:"flex", gap:7, alignItems:"flex-start", marginBottom:3 }}>
+                  <span style={{ color:"#6aaa7a", marginTop:2, flexShrink:0 }}>•</span>
+                  <span style={{ color:"#e8f0e4", fontSize:"0.89rem" }}>{line.content}</span>
+                </div>
+              : <p key={i} style={{ margin:"0 0 5px", fontSize:"0.89rem", color: line.type==="note" ? "rgba(232,240,228,0.55)" : "#e8f0e4" }}>{line.content}</p>
+          )}
+        </div>
+      )}
+
+      {/* Section cards */}
+      {hasSections && (
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {sections.map((sec, si) => (
+            <div key={si} style={S.sectionCard}>
+              {/* Section heading */}
+              <div style={{...S.sectionHead, marginBottom:2}}>
+                <span style={{ fontSize:"1rem" }}>{getSectionIcon(sec.heading)}</span>
+                <span style={S.sectionTitle}>{sec.heading}</span>
+              </div>
+
+              {/* Crop/item chips */}
+              {sec.items.length > 0 && (
+                <div style={{ display:"flex", flexDirection:"column", gap:6, marginTop:6 }}>
+                  {sec.items.map((item, ii) => {
+                    // If item has a colon, split into name + description
+                    const colonIdx = item.indexOf(":");
+                    const hasDesc = colonIdx > 0 && colonIdx < 40;
+                    const name = hasDesc ? item.slice(0, colonIdx).trim() : item;
+                    const desc = hasDesc ? item.slice(colonIdx + 1).trim() : null;
+                    return (
+                      <div key={ii} style={S.itemRow}>
+                        <div style={S.itemDot} />
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <span style={S.itemName}>{name}</span>
+                          {desc && <span style={S.itemDesc}> — {desc}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Notes / sub-text */}
+              {sec.notes.length > 0 && (
+                <div style={{ marginTop: sec.items.length ? 8 : 10, display:"flex", flexDirection:"column", gap:4 }}>
+                  {sec.notes.map((n, ni) => (
+                    <p key={ni} style={{ fontSize:"0.82rem", color:"rgba(232,240,228,0.5)", margin:0, lineHeight:1.5 }}>{n}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Message bubble ─────────────────────────────────────────────────────────
 
 function Message({ msg }) {
@@ -110,31 +240,14 @@ function Message({ msg }) {
   return (
     <div style={{ display:"flex", flexDirection:isUser?"row-reverse":"row", gap:10, marginBottom:18, alignItems:"flex-end" }}>
       {!isUser && <div style={S.botAvatar}>🌾</div>}
-      <div style={{ maxWidth:"74%", display:"flex", flexDirection:"column", gap:5, alignItems:isUser?"flex-end":"flex-start" }}>
+      <div style={{ maxWidth:"78%", display:"flex", flexDirection:"column", gap:5, alignItems:isUser?"flex-end":"flex-start" }}>
         {msg.imageUrl && (
           <img src={msg.imageUrl} alt="crop" style={{ maxWidth:180, borderRadius:12, border:"1px solid rgba(106,170,122,0.2)" }} />
         )}
         {msg.text && (
-          <div style={isUser ? S.userBubble : S.botBubble}>
-            {isUser ? msg.text : (
-              <ReactMarkdown
-                components={{
-                  p: ({children}) => <p style={{ margin:"0 0 6px" }}>{children}</p>,
-                  strong: ({children}) => <strong style={{ color:"#b5d6a0", fontWeight:700 }}>{children}</strong>,
-                  ul: ({children}) => <ul style={{ paddingLeft:18, margin:"4px 0" }}>{children}</ul>,
-                  ol: ({children}) => <ol style={{ paddingLeft:18, margin:"4px 0" }}>{children}</ol>,
-                  li: ({children}) => <li style={{ marginBottom:3 }}>{children}</li>,
-                  h1: ({children}) => <h1 style={{ fontSize:"1rem", color:"#b5d6a0", fontWeight:700, margin:"8px 0 4px" }}>{children}</h1>,
-                  h2: ({children}) => <h2 style={{ fontSize:"0.95rem", color:"#b5d6a0", fontWeight:700, margin:"8px 0 4px" }}>{children}</h2>,
-                  h3: ({children}) => <h3 style={{ fontSize:"0.9rem", color:"#8fbc8f", fontWeight:700, margin:"6px 0 3px" }}>{children}</h3>,
-                  code: ({children}) => <code style={{ background:"rgba(106,170,122,0.12)", borderRadius:4, padding:"1px 5px", fontSize:"0.85em", color:"#b5d6a0" }}>{children}</code>,
-                  hr: () => <hr style={{ border:"none", borderTop:"1px solid rgba(106,170,122,0.15)", margin:"8px 0" }}/>,
-                }}
-              >
-                {msg.text}
-              </ReactMarkdown>
-            )}
-          </div>
+          isUser
+            ? <div style={S.userBubble}>{msg.text}</div>
+            : <StructuredBotMessage text={msg.text} />
         )}
         {msg.status==="weather"    && msg.data && <WeatherCard data={msg.data}/>}
         {msg.status==="crop"       && msg.data && <CropCard data={msg.data}/>}
@@ -499,6 +612,13 @@ const S = {
   histActive: { background:"rgba(106,170,122,0.1)", color:"#b5d6a0" },
   micPulse:   { position:"absolute", inset:0, borderRadius:"50%", border:"2px solid #f87171", animation:"krishiMicPulse 1s ease-out infinite", pointerEvents:"none" },
   avatarFb:   { width:32, height:32, borderRadius:"50%", background:"linear-gradient(135deg,#3a6b47,#6aaa7a)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:800, fontSize:"0.84rem", cursor:"pointer", flexShrink:0 },
+  sectionCard:{ background:"rgba(106,170,122,0.06)", border:"1px solid rgba(106,170,122,0.16)", borderRadius:14, padding:"12px 14px" },
+  sectionHead:{ display:"flex", alignItems:"center", gap:8 },
+  sectionTitle:{ fontWeight:700, color:"#b5d6a0", fontSize:"0.88rem", letterSpacing:"0.01em" },
+  itemRow:    { display:"flex", alignItems:"flex-start", gap:9, lineHeight:1.5 },
+  itemDot:    { width:6, height:6, borderRadius:"50%", background:"#6aaa7a", marginTop:6, flexShrink:0 },
+  itemName:   { fontWeight:700, color:"#e8f0e4", fontSize:"0.88rem" },
+  itemDesc:   { color:"rgba(232,240,228,0.55)", fontSize:"0.84rem", fontWeight:400 },
 };
 
 const CSS = `
