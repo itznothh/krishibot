@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Sidebar from "./Sidebar";
 
-const BACKEND = "https://krishibot-api.onrender.com";
+const BACKEND = "https://krishibot-8tiv.onrender.com";
 
 const STATES = [
   "Andhra Pradesh","Bihar","Delhi","Gujarat","Haryana","Himachal Pradesh",
