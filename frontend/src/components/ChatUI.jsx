@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 
-const BACKEND = "https://krishibot-api.onrender.com";
+const BACKEND = "https://krishibot-8tiv.onrender.com";
 
 // ── Voice recognition helper ───────────────────────────────────────────────
 const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition || null;
