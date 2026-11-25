@@ -28,7 +28,7 @@ def analyze_crop_image(image_base64: str, mime_type: str = "image/jpeg") -> str:
                 "Content-Type": "application/json"
             },
             json={
-                "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+                "model": "qwen/qwen3.8-27b",
                 "messages": [
                     {
                         "role": "user",
