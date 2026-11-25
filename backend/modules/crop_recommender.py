@@ -61,7 +61,7 @@ def _translate_via_groq(english_text: str, language: str) -> str:
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
             json={
-                "model": "llama-3.3-70b-versatile",
+                "model": "openai/gpt-oss-120b",
                 "messages": [
                     {"role": "system", "content": f"You are a farming expert. Translate the following crop recommendation accurately to {lang_name}. Keep crop names in both languages. {enforcement}"},
                     {"role": "user", "content": english_text}

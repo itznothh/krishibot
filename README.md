@@ -71,7 +71,7 @@
 |-------|-----------|
 | Frontend | HTML, CSS, Vanilla JavaScript |
 | Backend | Python, Flask |
-| AI Model | Groq API → `llama-3.3-70b-versatile` |
+| AI Model | Groq API → `openai/gpt-oss-120b` |
 | Image Analysis | Groq LLaMA Vision |
 | Weather | OpenWeatherMap API |
 | WhatsApp | Twilio Messaging API |

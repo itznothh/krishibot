@@ -92,7 +92,7 @@ def classify_intent(message: str) -> str:
         client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
         resp = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             max_tokens=60,
             temperature=0,
             messages=[
@@ -384,7 +384,7 @@ def schemes():
                 "Content-Type": "application/json"
             },
             json={
-                "model": "llama-3.3-70b-versatile",
+                "model": "openai/gpt-oss-120b",
                 "messages": [
                     {
                         "role": "system",
