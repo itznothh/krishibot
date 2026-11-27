@@ -3,6 +3,7 @@ import { BACKEND, readApiResponse } from "../api";
 import { ImageDiagnosisCard } from "./ImageDiagnosisCard";
 import { WeatherCard } from "./WeatherCard";
 import { buildConversationHistory } from "./conversationHistory";
+import { formatChatError, mapChatResponse } from "./chatResponses";
 import { BrowserVoiceInput, extractSpeakableText, getSpeechRecognition, normalizeTranscriptEdit, releaseSubmission, speakText, stopSpeech, tryAcquireSubmission } from "./browserVoice";
 
 // ── Voice recognition helper ───────────────────────────────────────────────
@@ -346,14 +347,15 @@ export default function ChatUI({ user, onSignOut, onBack }) {
           }),
         });
         const data = await readApiResponse(res);
-        addBot(data.message || "I couldn’t prepare a response. Please try again.", data.status, data.data);
+        const assistantMessage = mapChatResponse(data);
+        addBot(assistantMessage.text, assistantMessage.status, assistantMessage.data);
       }
       setVoiceMessage("");
     } catch (error) {
       setMessages(prev => prev.filter(message => message.id !== userMessageId));
       setInput(text);
       setVoiceHasTranscript(wasVoiceTranscript);
-      addBot(`Could not get a response: ${error.message || "check your connection and try again"}.`, "error", null);
+      addBot(formatChatError(error), "error", null);
     } finally {
       releaseSubmission(requestInFlightRef);
       setLoading(false);
