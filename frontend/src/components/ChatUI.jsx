@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
-
-const BACKEND = "https://krishibot-api.onrender.com";
+import { BACKEND, readApiResponse } from "../api";
 
 // ── Voice recognition helper ───────────────────────────────────────────────
 const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition || null;
@@ -327,22 +326,28 @@ export default function ChatUI({ user, onSignOut, onBack }) {
         fd.append("language", lang);
         if (text) fd.append("message", text);
         const res  = await fetch(`${BACKEND}/analyze-image`, { method:"POST", body:fd });
-        const data = await res.json();
+        const data = await readApiResponse(res);
         addBot(data.message || data.analysis || "Here's what I found in your crop image.", "image_analysis", data.data || data);
       } else {
         const res  = await fetch(`${BACKEND}/chat`, {
           method:"POST",
           headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ message:text, language:lang, lat:location?.lat, lon:location?.lon, context:{} }),
+          body: JSON.stringify({
+            message:text,
+            language:lang,
+            lat:location?.lat,
+            lon:location?.lon,
+            context:{ history: messages.filter(m => m.text && ["user", "bot"].includes(m.role)).slice(-8).map(m => ({ role:m.role === "bot" ? "assistant" : "user", content:m.text })) },
+          }),
         });
-        const data = await res.json();
-        addBot(data.message, data.status, data.data);
+        const data = await readApiResponse(res);
+        addBot(data.message || "I couldn’t prepare a response. Please try again.", data.status, data.data);
       }
-    } catch {
-      addBot("⚠️ Could not reach KrishiBot server. The backend may be waking up (cold start on free tier — ~30–60s). Please try again shortly.", "error", null);
+    } catch (error) {
+      addBot(`Could not get a response: ${error.message || "check your connection and try again"}.`, "error", null);
     }
     setLoading(false);
-  }, [input, imageFile, imagePreview, lang, location, loading]);
+  }, [input, imageFile, imagePreview, lang, location, loading, messages]);
 
   const handleKey = (e) => {
     if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
@@ -367,11 +372,12 @@ export default function ChatUI({ user, onSignOut, onBack }) {
 
   // ── Voice recognition ───────────────────────────────────────────────────
   const [listening, setListening] = useState(false);
+  const [voiceMessage, setVoiceMessage] = useState("");
   const recognizerRef = useRef(null);
 
   const toggleVoice = useCallback(() => {
     if (!SpeechAPI) {
-      alert("Voice recognition is not supported in this browser. Try Chrome.");
+      setVoiceMessage("Voice typing is unavailable here. Try Chrome or Edge, or type your question.");
       return;
     }
     if (listening) {
@@ -383,12 +389,29 @@ export default function ChatUI({ user, onSignOut, onBack }) {
     rec.lang = LANG_SPEECH_CODE[lang] || "en-IN";
     rec.interimResults = true;
     rec.continuous = false;
+    rec.maxAlternatives = 3;
+    let gotResult = false;
+    setVoiceMessage("");
     rec.onstart  = () => setListening(true);
-    rec.onend    = () => setListening(false);
-    rec.onerror  = () => setListening(false);
+    rec.onend    = () => {
+      setListening(false);
+      if (!gotResult) setVoiceMessage("I didn’t catch that. Check the selected language and try speaking closer to the microphone in a quieter place.");
+    };
+    rec.onerror  = (event) => {
+      setListening(false);
+      const errors = {
+        "not-allowed": "Microphone access is blocked. Allow it in your browser settings.",
+        "no-speech": "I didn’t hear speech. Try again after the microphone starts.",
+        "audio-capture": "No microphone was found. Check that it is connected and enabled.",
+        "network": "The browser’s voice service is unavailable. Check your connection and try again.",
+      };
+      setVoiceMessage(errors[event.error] || "Voice typing stopped. Please try again or type your question.");
+    };
     rec.onresult = (e) => {
+      gotResult = true;
       const transcript = Array.from(e.results).map(r => r[0].transcript).join("");
       setInput(transcript);
+      setVoiceMessage("Review the transcript and correct any words before sending.");
       if (e.results[e.results.length - 1].isFinal) {
         setListening(false);
       }
@@ -573,6 +596,7 @@ export default function ChatUI({ user, onSignOut, onBack }) {
             </button>
           </div>
           <div style={S.hint}>
+            {voiceMessage && <span style={{ color:voiceMessage.startsWith("Review") ? "#6aaa7a" : "#f4a261" }}>{voiceMessage}<br /></span>}
             Enter to send · Shift+Enter new line
             {location && <span style={{ color:"#6aaa7a" }}> · 📍 Location active</span>}
           </div>

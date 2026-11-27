@@ -22,6 +22,16 @@ Rules:
 - If the farmer says things like "did u got?", "did you get it?", "mila?", "got it?" — they are confirming or asking about the PREVIOUS conversation, respond based on that context
 - NEVER ask the farmer to share location, city, district or state — the app handles location automatically via a button"""
 
+# Keep answers useful without encouraging the model to invent farm-specific facts.
+SYSTEM_PROMPT += """
+- Start with the direct answer, then give a short practical next step.
+- Tailor advice to details the farmer actually gave; if a missing detail changes the recommendation, ask one focused follow-up question.
+- Never invent live weather, mandi prices, scheme deadlines, or local rules. Say when current/local verification is needed.
+- For pesticide or fertilizer advice, distinguish general guidance from a confirmed diagnosis; do not recommend a banned/restricted product or invent a dose. Ask the farmer to follow the product label and local agricultural officer/KVK guidance.
+- Use metric units and state the basis (per litre, acre, or hectare) for any quantity.
+- Keep ordinary replies concise; use numbered steps only when there is an actual procedure.
+"""
+
 LANG_ENFORCEMENT = {
     "en": "FINAL INSTRUCTION: Your entire response MUST be in English only. Do not use Hindi or Kannada.",
     "hi": "अंतिम निर्देश: आपका पूरा उत्तर केवल हिंदी में होना चाहिए। एक भी अंग्रेजी या कन्नड़ शब्द का प्रयोग न करें।",
@@ -71,7 +81,7 @@ def _call_groq_api(message: str, context: dict) -> str:
                 "model": "openai/gpt-oss-120b",
                 "messages": messages,
                 "max_tokens": 500,
-                "temperature": 0.7
+                "temperature": 0.35
             },
             timeout=30
         )

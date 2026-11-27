@@ -135,7 +135,23 @@ def chat():
 
         message = data.get('message', '').strip()
         language = data.get('language', 'en')
+        if language not in ('en', 'hi', 'kn'):
+            language = 'en'
         context = data.get('context', {})
+        if not isinstance(context, dict):
+            context = {}
+        history = context.get('history', [])
+        if isinstance(history, list):
+            context['history'] = [
+                {'role': item.get('role'), 'content': item.get('content', '')[:2000]}
+                for item in history[-8:]
+                if isinstance(item, dict)
+                and item.get('role') in ('user', 'assistant')
+                and isinstance(item.get('content'), str)
+                and item.get('content').strip()
+            ]
+        else:
+            context['history'] = []
         lat = data.get('lat')
         lon = data.get('lon')
 

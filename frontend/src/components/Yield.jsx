@@ -1,7 +1,6 @@
 import { useState } from "react";
 import Sidebar from "./Sidebar";
-
-const BACKEND = "https://krishibot-api.onrender.com";
+import { BACKEND } from "../api";
 
 const CROPS = [
   { name: "Wheat",      yieldPerAcre: 16,  unit: "quintal" },

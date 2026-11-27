@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
-
-const BACKEND = "https://krishibot-api.onrender.com";
+import { BACKEND } from "../api";
 
 const STATES = [
   "Andhra Pradesh", "Bihar", "Delhi", "Gujarat", "Haryana",
