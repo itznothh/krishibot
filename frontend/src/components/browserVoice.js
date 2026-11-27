@@ -42,6 +42,133 @@ export function stopSpeech(synthesis) {
   }
 }
 
+function cleanSpeechString(value) {
+  if (typeof value !== "string") return "";
+  let text = value.trim();
+  if (!text) return "";
+
+  // JSON response text is decoded through the same user-facing field allowlist
+  // as structured responses; unknown fields and provider metadata are ignored.
+  if (text.startsWith("{") || text.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === "object") return extractSpeakableText(parsed);
+    } catch {
+      return "";
+    }
+  }
+  if (/^(?:\[object Object\]|undefined|null|\[object .+\])$/i.test(text)) return "";
+
+  text = text
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]+)\]\((?:https?:\/\/[^)]*)\)/g, "$1")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/\[object Object\]/gi, "")
+    .replace(/\bundefined\b/gi, "")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/^\s*\d+\.\s+/gm, "")
+    .replace(/[*_`>]/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{2,}/g, ". ")
+    .trim();
+  text = Array.from(text).filter(character => {
+    const code = character.charCodeAt(0);
+    return !((code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d)
+      || (code >= 0x7f && code <= 0x9f));
+  }).join("");
+  return /[\p{L}\p{N}]/u.test(text) ? text : "";
+}
+
+function speechList(value) {
+  if (typeof value === "string") return cleanSpeechString(value);
+  if (!Array.isArray(value)) return "";
+  return value.map(item => typeof item === "string"
+    ? cleanSpeechString(item)
+    : item && typeof item === "object" && typeof item.text === "string"
+      ? cleanSpeechString(item.text)
+      : "")
+    .filter(Boolean).join(". ");
+}
+
+function labeledSpeech(label, value) {
+  const text = speechList(value);
+  return text ? `${label}: ${text}.` : "";
+}
+
+function diagnosisSpeech(diagnosis) {
+  if (!diagnosis || typeof diagnosis !== "object" || Array.isArray(diagnosis)) return "";
+  if (diagnosis.success === false) return "";
+  const parts = [];
+  if (diagnosis.crop) parts.push(labeledSpeech("Crop", diagnosis.crop));
+  if (diagnosis.confidence_status === "uncertain" || !diagnosis.suspected_disease) {
+    parts.push("The image assessment is uncertain.");
+  }
+  if (diagnosis.suspected_disease) parts.push(labeledSpeech("Suspected disease or pest", diagnosis.suspected_disease));
+  if (diagnosis.severity) parts.push(labeledSpeech("Severity", diagnosis.severity));
+  parts.push(labeledSpeech("Visible symptoms", diagnosis.visible_symptoms));
+  parts.push(labeledSpeech("Possible causes", diagnosis.possible_causes));
+  const treatment = diagnosis.treatment && typeof diagnosis.treatment === "object" ? diagnosis.treatment : {};
+  parts.push(labeledSpeech("Immediate steps", treatment.immediate_steps));
+  parts.push(labeledSpeech("Organic approaches", treatment.organic));
+  parts.push(labeledSpeech("Chemical approaches", treatment.chemical));
+  parts.push(labeledSpeech("Prevention", diagnosis.prevention));
+  parts.push(labeledSpeech("Additional information needed", diagnosis.additional_information_needed));
+  if (parts.filter(Boolean).length) {
+    parts.push("This image-based guidance is preliminary. Confirm uncertain diagnoses and treatment choices with a local agricultural expert.");
+  }
+  return parts.filter(Boolean).join(" ");
+}
+
+function weatherSpeech(weather) {
+  if (!weather || typeof weather !== "object" || Array.isArray(weather)) return "";
+  const parts = [];
+  const location = weather.location || weather.city;
+  if (location) parts.push(labeledSpeech("Weather for", location));
+  const condition = weather.description || weather.condition;
+  if (condition) parts.push(labeledSpeech(weather.data_type === "forecast" ? "Forecast" : "Current conditions", condition));
+  if (Number.isFinite(weather.temperature)) parts.push(`Temperature: ${weather.temperature} degrees Celsius.`);
+  if (Number.isFinite(weather.humidity)) parts.push(`Humidity: ${weather.humidity} percent.`);
+  if (Number.isFinite(weather.wind_speed)) parts.push(`Wind speed: ${weather.wind_speed} meters per second.`);
+  parts.push(labeledSpeech("Farming advisory", weather.farming_advice));
+  return parts.filter(Boolean).join(" ");
+}
+
+/** Extract only user-facing text; IDs, timestamps, status and provider metadata are excluded. */
+export function extractSpeakableText(value) {
+  if (typeof value === "string") return cleanSpeechString(value);
+  if (!value || typeof value !== "object") return "";
+  if (Array.isArray(value)) return speechList(value);
+
+  const diagnosis = value.diagnosis || (value.status === "image_analysis" ? value.data : null);
+  if (diagnosis) return diagnosisSpeech(diagnosis);
+  const weather = value.weather || (value.status === "weather" ? value.data : null);
+  if (weather) return weatherSpeech(weather);
+
+  for (const key of ["text", "message", "answer", "response", "content", "result"]) {
+    const candidate = value[key];
+    if (typeof candidate === "string") {
+      const cleaned = cleanSpeechString(candidate);
+      if (cleaned) return cleaned;
+    } else if (candidate && typeof candidate === "object") {
+      const nested = extractSpeakableText(candidate);
+      if (nested) return nested;
+    }
+  }
+
+  if (value.suspected_disease || value.visible_symptoms || value.treatment) return diagnosisSpeech(value);
+
+  if (value.farming_advice || value.temperature !== undefined || value.wind_speed !== undefined) {
+    return weatherSpeech(value);
+  }
+
+  for (const key of ["data", "payload"]) {
+    const nested = extractSpeakableText(value[key]);
+    if (nested) return nested;
+  }
+  return "";
+}
+
 function startupErrorMessage(error) {
   if (error?.name === "NotAllowedError" || error?.name === "SecurityError") return ERROR_MESSAGES["not-allowed"];
   if (error?.name === "InvalidStateError") return "A voice session is already active. Stop it before retrying.";
@@ -191,8 +318,18 @@ export class BrowserVoiceInput {
 }
 
 export function speakText(text, language, environment = globalThis, callbacks = {}) {
+  const cleanText = extractSpeakableText(text);
+  if (!cleanText) return { ok:false, message:"There is no reply text to read aloud." };
+
   const synthesis = environment?.speechSynthesis;
   const Utterance = environment?.SpeechSynthesisUtterance;
+  if (synthesis && typeof synthesis.cancel === "function") {
+    try {
+      synthesis.cancel();
+    } catch {
+      return { ok:false, message:"Could not stop the previous spoken reply. Try again or read the text." };
+    }
+  }
   if (!synthesis || typeof synthesis.speak !== "function" || typeof Utterance !== "function") {
     return { ok:false, message:"Spoken replies are not supported in this browser. You can read or copy the reply." };
   }
@@ -201,6 +338,7 @@ export function speakText(text, language, environment = globalThis, callbacks = 
   try {
     voices = typeof synthesis.getVoices === "function" ? synthesis.getVoices() : [];
   } catch {
+    stopSpeech(synthesis);
     return { ok:false, message:"Could not load speech voices on this device. Try again or read the reply." };
   }
   const voice = voices.find(item => item.lang?.toLowerCase() === lang.toLowerCase())
@@ -208,9 +346,6 @@ export function speakText(text, language, environment = globalThis, callbacks = 
   if (voices.length && !voice) {
     return { ok:false, message:`No ${language === "hi" ? "Hindi" : language === "kn" ? "Kannada" : "English"} speech voice is available on this device. Add a system voice or read the reply.` };
   }
-
-  const cleanText = String(text || "").replace(/https?:\/\/\S+/g, "link omitted").replace(/[*_#`>]/g, "").trim();
-  if (!cleanText) return { ok:false, message:"There is no reply text to read aloud." };
   try {
     const utterance = new Utterance(cleanText);
     utterance.lang = lang;
@@ -218,7 +353,6 @@ export function speakText(text, language, environment = globalThis, callbacks = 
     utterance.onstart = callbacks.onStart;
     utterance.onend = callbacks.onEnd;
     utterance.onerror = callbacks.onError;
-    synthesis.cancel();
     synthesis.speak(utterance);
     return { ok:true, utterance };
   } catch {

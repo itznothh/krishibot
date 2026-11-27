@@ -3,7 +3,7 @@ import { BACKEND, readApiResponse } from "../api";
 import { ImageDiagnosisCard } from "./ImageDiagnosisCard";
 import { WeatherCard } from "./WeatherCard";
 import { buildConversationHistory } from "./conversationHistory";
-import { BrowserVoiceInput, getSpeechRecognition, normalizeTranscriptEdit, releaseSubmission, speakText, stopSpeech, tryAcquireSubmission } from "./browserVoice";
+import { BrowserVoiceInput, extractSpeakableText, getSpeechRecognition, normalizeTranscriptEdit, releaseSubmission, speakText, stopSpeech, tryAcquireSubmission } from "./browserVoice";
 
 // ── Voice recognition helper ───────────────────────────────────────────────
 const SUGGESTIONS = [
@@ -204,6 +204,7 @@ function StructuredBotMessage({ text }) {
 
 function Message({ msg, language, speakingMessageId, onSpeak, onStopSpeech }) {
   const isUser = msg.role === "user";
+  const spokenText = !isUser ? extractSpeakableText(msg) : "";
   return (
     <div style={{ display:"flex", flexDirection:isUser?"row-reverse":"row", gap:10, marginBottom:18, alignItems:"flex-end" }}>
       {!isUser && <div style={S.botAvatar}>🌾</div>}
@@ -216,8 +217,8 @@ function Message({ msg, language, speakingMessageId, onSpeak, onStopSpeech }) {
             ? <div style={S.userBubble}>{msg.text}</div>
             : <StructuredBotMessage text={msg.text} />
         )}
-        {!isUser && msg.text && (
-          <button type="button" onClick={()=>speakingMessageId===msg.id ? onStopSpeech() : onSpeak(msg, language)}
+        {spokenText && (
+          <button type="button" onClick={()=>speakingMessageId===msg.id ? onStopSpeech() : onSpeak(spokenText, msg.id, language)}
             aria-label={speakingMessageId===msg.id ? "Stop spoken reply" : "Read reply aloud"}
             title={speakingMessageId===msg.id ? "Stop spoken reply" : "Read reply aloud"}
             style={S.speechBtn}>
@@ -484,10 +485,10 @@ export default function ChatUI({ user, onSignOut, onBack }) {
     setSpeechMessage("Spoken reply stopped.");
   }, []);
 
-  const speakReply = useCallback((message, language) => {
+  const speakReply = useCallback((text, messageId, language) => {
     const requestId = ++speechRunRef.current;
-    const result = speakText(message, language, window, {
-      onStart:() => { if (speechRunRef.current === requestId) { setSpeakingMessageId(message.id); setSpeechMessage(""); } },
+    const result = speakText(text, language, window, {
+      onStart:() => { if (speechRunRef.current === requestId) { setSpeakingMessageId(messageId); setSpeechMessage(""); } },
       onEnd:() => { if (speechRunRef.current === requestId) setSpeakingMessageId(null); },
       onError:() => { if (speechRunRef.current === requestId) { setSpeakingMessageId(null); setSpeechMessage("Spoken reply stopped unexpectedly. Try again or read the text."); } },
     });
@@ -495,7 +496,7 @@ export default function ChatUI({ user, onSignOut, onBack }) {
       setSpeakingMessageId(null);
       setSpeechMessage(result.message);
     } else {
-      setSpeakingMessageId(message.id);
+      setSpeakingMessageId(messageId);
       setSpeechMessage("");
     }
   }, []);

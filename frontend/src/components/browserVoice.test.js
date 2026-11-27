@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   BrowserVoiceInput,
   SPEECH_LANGUAGES,
+  extractSpeakableText,
   getSpeechRecognition,
   normalizeTranscriptEdit,
   releaseSubmission,
@@ -149,4 +150,92 @@ test("speech synthesis uses matching language voices, supports stop, and reports
   assert.equal(stopSpeech(synthesis), true);
   assert.equal(synthesis.cancelled, true);
   assert.equal(stopSpeech({}), false);
+});
+
+test("extracts only readable text from message and structured diagnosis responses", () => {
+  const message = {
+    role:"bot", text:"**Check the soil moisture.**", status:"ai_response",
+    id:12345, time:"10:42", data:{ secret:"internal metadata" },
+  };
+  assert.equal(extractSpeakableText(message), "Check the soil moisture.");
+
+  const diagnosis = extractSpeakableText({
+    role:"bot", status:"image_analysis", id:987,
+    data:{
+      success:true, crop:"Tomato", visible_symptoms:["Yellow spots near leaf edges"],
+      suspected_disease:"Possible early blight", severity:"Mild", confidence_status:"uncertain",
+      possible_causes:["Fungal infection"],
+      treatment:{ immediate_steps:["Remove badly affected leaves"], organic:["Improve airflow"], chemical:["Use only a locally approved product as labelled"] },
+      prevention:["Avoid overhead watering"], additional_information_needed:["Share a clearer photo"],
+      provider:"internal-provider", raw_response:"do not speak this",
+    },
+  });
+  assert.match(diagnosis, /Crop: Tomato/);
+  assert.match(diagnosis, /The image assessment is uncertain/);
+  assert.match(diagnosis, /Visible symptoms: Yellow spots near leaf edges/);
+  assert.match(diagnosis, /Organic approaches: Improve airflow/);
+  assert.doesNotMatch(diagnosis, /internal-provider|raw_response|987|success/);
+
+  const weather = extractSpeakableText({
+    role:"bot", status:"weather", id:654,
+    data:{ location:"Mysuru", temperature:30, condition:"Clear", humidity:70, wind_speed:2.5,
+      farming_advice:"Check soil moisture before irrigating.", source:"OpenWeatherMap", retrieved_at:"2026-11-27T00:00:00Z" },
+  });
+  assert.match(weather, /Weather for: Mysuru/);
+  assert.match(weather, /Farming advisory: Check soil moisture/);
+  assert.doesNotMatch(weather, /OpenWeatherMap|2026|654/);
+
+  assert.equal(extractSpeakableText({ role:"bot", id:1, time:"10:42", status:"unknown", data:{ arbitrary:{ value:true } } }), "");
+});
+
+test("rejects object coercion, undefined and raw JSON while decoding known JSON text", () => {
+  assert.equal(extractSpeakableText({}), "");
+  assert.equal(extractSpeakableText(undefined), "");
+  assert.equal(extractSpeakableText("[object Object]"), "");
+  assert.equal(extractSpeakableText("undefined"), "");
+  assert.equal(extractSpeakableText('{"status":"ok","secret":"x"}'), "");
+  assert.equal(extractSpeakableText('{"message":"Water the crop in the morning","api_key":"hidden"}'), "Water the crop in the morning");
+
+  class FakeUtterance { constructor(text) { this.text = text; } }
+  const synthesis = { getVoices:()=>[], speak(item){ this.current = item; }, cancel(){ this.cancelled = true; } };
+  const environment = { speechSynthesis:synthesis, SpeechSynthesisUtterance:FakeUtterance };
+  const result = speakText({ id:4, data:{ arbitrary:"metadata" } }, "en", environment);
+  assert.equal(result.ok, false);
+  assert.match(result.message, /no reply text/i);
+  assert.equal(synthesis.current, undefined);
+});
+
+test("preserves all three speech languages and replaces a previous utterance cleanly", () => {
+  class FakeUtterance { constructor(text) { this.text = text; } }
+  const synthesis = {
+    voices:[], cancelled:0, utterances:[],
+    getVoices(){ return this.voices; },
+    cancel(){ this.cancelled += 1; },
+    speak(item){ this.utterances.push(item); },
+  };
+  const environment = { speechSynthesis:synthesis, SpeechSynthesisUtterance:FakeUtterance };
+  for (const [language, expected] of [["en","en-IN"],["hi","hi-IN"],["kn","kn-IN"]]) {
+    const result = speakText("नमस्ते farmer", language, environment);
+    assert.equal(result.ok, true);
+    assert.equal(result.utterance.lang, expected);
+  }
+  assert.equal(synthesis.cancelled, 3);
+  assert.equal(synthesis.utterances.length, 3);
+  assert.equal(stopSpeech(synthesis), true);
+  assert.equal(synthesis.cancelled, 4);
+});
+
+test("stops the previous reply even when the next language has no installed voice", () => {
+  class FakeUtterance { constructor(text) { this.text = text; } }
+  const synthesis = {
+    cancelled:0, utterances:[], getVoices:()=>[{ lang:"en-IN" }],
+    cancel(){ this.cancelled += 1; }, speak(item){ this.utterances.push(item); },
+  };
+  const environment = { speechSynthesis:synthesis, SpeechSynthesisUtterance:FakeUtterance };
+  assert.equal(speakText("First answer", "en", environment).ok, true);
+  const unsupported = speakText("ಹಲೋ", "kn", environment);
+  assert.equal(unsupported.ok, false);
+  assert.match(unsupported.message, /Kannada speech voice/);
+  assert.equal(synthesis.cancelled, 2);
+  assert.equal(synthesis.utterances.length, 1);
 });
