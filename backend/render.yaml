@@ -9,3 +9,27 @@ services:
         sync: false
       - key: OPENWEATHER_API_KEY
         sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WEBHOOK_URL
+        sync: false
+      - key: AGMARKNET_API_KEY
+        sync: false
+      - key: RATE_LIMIT_CHAT_PER_MINUTE
+        value: "20"
+      - key: RATE_LIMIT_IMAGE_PER_MINUTE
+        value: "5"
+      - key: RATE_LIMIT_SCHEMES_PER_MINUTE
+        value: "5"
+      - key: RATE_LIMIT_WEATHER_PER_MINUTE
+        value: "15"
+      - key: RATE_LIMIT_MANDI_MARKETS_PER_MINUTE
+        value: "20"
+      - key: RATE_LIMIT_MANDI_PRICES_PER_MINUTE
+        value: "30"
+      - key: RATE_LIMIT_WHATSAPP_PER_MINUTE
+        value: "15"
+      - key: RATE_LIMIT_TRUSTED_PROXY_HOPS
+        value: "0"

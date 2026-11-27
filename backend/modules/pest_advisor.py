@@ -1,10 +1,9 @@
 """
 KrishiBot - Pest and Disease Advisory Module
 """
-import os
-import requests
+from modules.ai_assistant import answer_specialist_follow_up, translate_specialist_response
+from modules.conversation import normalize_history
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 PEST_DATABASE = {
     "aphid": {
@@ -119,34 +118,12 @@ LANG_ENFORCEMENT = {
 }
 
 def _translate_via_groq(english_text: str, language: str) -> str:
-    """Translate a pre-built English response to Hindi or Kannada via Groq."""
-    if not GROQ_API_KEY or language == "en":
-        return english_text
-    lang_name = "Hindi" if language == "hi" else "Kannada"
-    enforcement = LANG_ENFORCEMENT.get(language, "")
-    try:
-        response = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-            json={
-                "model": "openai/gpt-oss-120b",
-                "messages": [
-                    {"role": "system", "content": f"You are a farming expert. Translate the following farming advice accurately to {lang_name}. Keep crop names, chemical names, and measurements as-is. {enforcement}"},
-                    {"role": "user", "content": english_text}
-                ],
-                "max_tokens": 700,
-                "temperature": 0.3
-            },
-            timeout=20
-        )
-        data = response.json()
-        if "choices" in data:
-            return data["choices"][0]["message"]["content"]
-    except Exception:
-        pass
-    return english_text
+    return translate_specialist_response(english_text, language)
 
-def get_pest_advice(message: str, language: str = "en") -> str:
+def get_pest_advice(message: str, language: str = "en", context: dict = None) -> str:
+    history = normalize_history(context.get("history") if isinstance(context, dict) else None, current_message=message)
+    if history:
+        return answer_specialist_follow_up(message, {**context, "history":history}, language, "pest and disease")
     msg_lower = message.lower()
 
     for pest_key, pest_info in PEST_DATABASE.items():

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Sidebar from "./Sidebar";
 import { BACKEND } from "../api";
+import { SafeMarkdown } from "./SafeMarkdown";
 
 const STATES = [
   "Andhra Pradesh","Bihar","Delhi","Gujarat","Haryana","Himachal Pradesh",
@@ -92,7 +93,7 @@ export default function Schemes({ user, onSignOut, onChatClick }) {
   function renderCards(text) {
     // Split by blank lines or --- to get blocks
     const blocks = text.split(/\n(?=SCHEME:|LOAN:|PLAN:)/).map(b => b.trim()).filter(Boolean);
-    if (blocks.length === 0) return <div dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }} />;
+    if (blocks.length === 0) return <SafeMarkdown text={text} />;
     return blocks.map((block, i) => {
       const lines = block.split('\n').filter(l => l.trim() && !l.startsWith('---'));
       const fields = {};
@@ -137,13 +138,6 @@ export default function Schemes({ user, onSignOut, onChatClick }) {
         </div>
       );
     });
-  }
-
-    function renderMarkdown(text) {
-    return text
-      .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#b5d6a0">$1</strong>')
-      .replace(/^- (.*)/gm, '<div style="display:flex;gap:8px;margin:4px 0"><span style="color:#6aaa7a">•</span><span>$1</span></div>')
-      .replace(/\n/g, '<br/>');
   }
 
   return (
@@ -289,7 +283,7 @@ export default function Schemes({ user, onSignOut, onChatClick }) {
             )}
             {!chatLoading && chatResult && (
               <div className="fade-up" style={{ marginTop: 16, padding: "16px", background: "rgba(106,170,122,0.05)", borderRadius: 12, lineHeight: 1.7, fontSize: "0.9rem", color: "rgba(232,240,228,0.85)" }}>
-                <div dangerouslySetInnerHTML={{ __html: renderMarkdown(chatResult) }} />
+                <SafeMarkdown text={chatResult} />
               </div>
             )}
           </div>

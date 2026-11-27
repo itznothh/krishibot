@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
 import Sidebar from "./Sidebar";
 import { BACKEND } from "../api";
 
@@ -72,7 +71,6 @@ function today() {
 }
 
 export default function Mandi({ user, onSignOut, onChatClick }) {
-  const navigate = useNavigate();
   const [state, setState] = useState("Karnataka");
   const [mandi, setMandi] = useState("");
   const [date, setDate] = useState(today());
@@ -83,16 +81,6 @@ export default function Mandi({ user, onSignOut, onChatClick }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
-
-  // Fetch mandis when state changes
-  useEffect(() => {
-    fetchMandis(state);
-  }, [state]);
-
-  // Fetch prices when mandi or date changes
-  useEffect(() => {
-    if (mandi) fetchPrices();
-  }, [mandi, date]);
 
   async function fetchMandis(stateName) {
     const fallback = FALLBACK_MARKETS[stateName] || ["All Markets"];
@@ -111,7 +99,13 @@ export default function Mandi({ user, onSignOut, onChatClick }) {
     }
   }
 
-  async function fetchPrices() {
+  // Fetch mandis when state changes.
+  useEffect(() => {
+    const timer = setTimeout(() => fetchMandis(state), 0);
+    return () => clearTimeout(timer);
+  }, [state]);
+
+  const fetchPrices = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -127,14 +121,21 @@ export default function Mandi({ user, onSignOut, onChatClick }) {
       const list = data.prices && data.prices.length > 0 ? data.prices : FALLBACK_PRICES;
       setPrices(list);
       setLastUpdated(new Date().toLocaleTimeString() + (data.prices?.length > 0 ? "" : " (sample data)"));
-    } catch (e) {
+    } catch {
       // Always show fallback — never a blank error screen
       setPrices(FALLBACK_PRICES);
       setLastUpdated(new Date().toLocaleTimeString() + " (sample data)");
       setError(null);
     }
     setLoading(false);
-  }
+  }, [state, mandi, date]);
+
+  // Refresh when the selected market, date, or state changes.
+  useEffect(() => {
+    if (!mandi) return undefined;
+    const timer = setTimeout(() => fetchPrices(), 0);
+    return () => clearTimeout(timer);
+  }, [mandi, fetchPrices]);
 
   const filtered = prices.filter(p => {
     const matchCat = category === "All" || (CATEGORY_MAP[category] || []).includes(p.commodity);

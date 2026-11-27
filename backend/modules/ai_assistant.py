@@ -1,5 +1,6 @@
 import os
 import requests
+from modules.conversation import normalize_history
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
@@ -38,13 +39,39 @@ LANG_ENFORCEMENT = {
     "kn": "ಅಂತಿಮ ಸೂಚನೆ: ನಿಮ್ಮ ಸಂಪೂರ್ಣ ಉತ್ತರ ಕೇವಲ ಕನ್ನಡದಲ್ಲಿ ಇರಬೇಕು. ಇಂಗ್ಲಿಷ್ ಅಥವಾ ಹಿಂದಿ ಬಳಸಬೇಡಿ.",
 }
 
+class AIProviderError(Exception):
+    """Raised when Groq cannot provide a valid assistant response."""
+
+
 def get_ai_response(message: str, context: dict, language: str = None) -> str:
     if not GROQ_API_KEY:
-        return "AI assistant not configured. Please set GROQ_API_KEY."
+        raise AIProviderError("AI service is not configured.")
+    context = dict(context) if isinstance(context, dict) else {}
     if language:
         context = dict(context)
         context["language"] = language
     return _call_groq_api(message, context)
+
+
+def translate_specialist_response(text: str, language: str) -> str:
+    if language == "en":
+        return text
+    if language not in ("hi", "kn"):
+        language = "en"
+    if not GROQ_API_KEY:
+        raise AIProviderError("AI service is not configured.")
+    lang_name = "Hindi" if language == "hi" else "Kannada"
+    return _call_groq_api(
+        text,
+        {"language": language, "translation_only": True, "language_name": lang_name},
+    )
+
+
+def answer_specialist_follow_up(message: str, context: dict, language: str, specialist: str) -> str:
+    specialist_context = dict(context) if isinstance(context, dict) else {}
+    specialist_context["specialist"] = specialist
+    specialist_context["language"] = language
+    return get_ai_response(message, specialist_context, language=language)
 
 def _call_groq_api(message: str, context: dict) -> str:
     try:
@@ -64,11 +91,25 @@ def _call_groq_api(message: str, context: dict) -> str:
 
         system += "\n\nCurrent session info:\n" + "\n".join(session_info)
         system += "\n\n" + LANG_ENFORCEMENT.get(lang, LANG_ENFORCEMENT["en"])
+        specialist = context.get("specialist")
+        if specialist:
+            system += (
+                f"\n\nYou are answering a follow-up as the KrishiBot {specialist} specialist. "
+                "Use the bounded conversation history to resolve references and retain crop, soil, "
+                "season, pest, symptom, and growth-stage details already provided. Do not ask the "
+                "farmer to repeat known details. Ask one focused question only when a missing detail "
+                "materially changes the guidance. Do not invent measurements or diagnoses."
+            )
+        if context.get("translation_only"):
+            system = (
+                f"Translate the user content faithfully into {context.get('language_name', 'English')}. "
+                "Preserve all agricultural meaning, names, and quantities. Return only the translation.\n\n"
+                + LANG_ENFORCEMENT.get(lang, LANG_ENFORCEMENT["en"])
+            )
 
         messages = [{"role": "system", "content": system}]
-        if context.get("history"):
-            for entry in context["history"][-6:]:
-                messages.append({"role": entry["role"], "content": entry["content"]})
+        for entry in normalize_history(context.get("history"), current_message=message):
+            messages.append({"role": entry["role"], "content": entry["content"]})
         messages.append({"role": "user", "content": message})
 
         response = requests.post(
@@ -80,16 +121,20 @@ def _call_groq_api(message: str, context: dict) -> str:
             json={
                 "model": "openai/gpt-oss-120b",
                 "messages": messages,
-                "max_tokens": 500,
+                "max_tokens": 900 if context.get("translation_only") else 500,
                 "temperature": 0.35
             },
             timeout=30
         )
+        response.raise_for_status()
         data = response.json()
-        if "choices" in data:
-            return data["choices"][0]["message"]["content"]
-        else:
-            error_msg = data.get("error", {}).get("message", str(data))
-            return f"AI Error: {error_msg}"
-    except Exception as e:
-        return f"Sorry, could not process your question. Please try again. Error: {str(e)}"
+        content = data["choices"][0]["message"]["content"]
+        if not isinstance(content, str) or not content.strip():
+            raise AIProviderError("AI service returned an empty response.")
+        return content.strip()
+    except AIProviderError:
+        raise
+    except requests.exceptions.RequestException as error:
+        raise AIProviderError("AI service is temporarily unavailable.") from error
+    except (KeyError, IndexError, TypeError, ValueError) as error:
+        raise AIProviderError("AI service returned an invalid response.") from error

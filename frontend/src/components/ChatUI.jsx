@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import ReactMarkdown from "react-markdown";
 import { BACKEND, readApiResponse } from "../api";
+import { ImageDiagnosisCard } from "./ImageDiagnosisCard";
+import { WeatherCard } from "./WeatherCard";
+import { buildConversationHistory } from "./conversationHistory";
+import { BrowserVoiceInput, getSpeechRecognition, normalizeTranscriptEdit, releaseSubmission, speakText, stopSpeech, tryAcquireSubmission } from "./browserVoice";
 
 // ── Voice recognition helper ───────────────────────────────────────────────
-const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition || null;
-
-const LANG_SPEECH_CODE = { en:"en-IN", hi:"hi-IN", kn:"kn-IN" };
-
 const SUGGESTIONS = [
   { icon: "🌾", text: "Which crops to grow this season?" },
   { icon: "🐛", text: "My tomato leaves have yellow spots" },
@@ -24,31 +23,6 @@ const LANG_OPTIONS = [
 
 // ── Rich data cards ────────────────────────────────────────────────────────
 
-function WeatherCard({ data }) {
-  if (!data) return null;
-  return (
-    <div style={S.infoCard}>
-      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
-        <span style={{ fontSize:"1.5rem" }}>🌦️</span>
-        <div style={{ flex:1 }}>
-          <div style={{ fontWeight:700, color:"#b5d6a0", fontSize:"0.9rem" }}>{data.city || "Weather"}</div>
-          <div style={{ color:"rgba(232,240,228,0.45)", fontSize:"0.76rem" }}>{data.description || ""}</div>
-        </div>
-        {data.temperature && (
-          <div style={{ fontFamily:"'Sora',sans-serif", fontSize:"1.5rem", fontWeight:800, color:"#6aaa7a" }}>
-            {Math.round(data.temperature)}°C
-          </div>
-        )}
-      </div>
-      {(data.humidity || data.wind_speed) && (
-        <div style={{ display:"flex", gap:16, borderTop:"1px solid rgba(106,170,122,0.15)", paddingTop:10 }}>
-          {data.humidity   && <span style={S.metaStat}>💧 {data.humidity}% humidity</span>}
-          {data.wind_speed && <span style={S.metaStat}>💨 {data.wind_speed} km/h</span>}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function CropCard({ data }) {
   const crops = data?.recommended_crops || data?.crops || [];
@@ -81,23 +55,6 @@ function FertilizerCard({ data }) {
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-function ImageResultCard({ data }) {
-  if (!data?.disease && !data?.diagnosis) return null;
-  return (
-    <div style={{ ...S.infoCard, borderColor:"rgba(239,120,80,0.25)", background:"rgba(239,120,80,0.05)" }}>
-      <div style={{ ...S.cardLabel, color:"#f4a261" }}><span>🔬</span> Disease Detected</div>
-      <div style={{ color:"#e8f0e4", fontWeight:700, fontSize:"0.95rem", marginTop:8 }}>
-        {data.disease || data.diagnosis}
-      </div>
-      {data.confidence && (
-        <div style={{ color:"rgba(232,240,228,0.4)", fontSize:"0.76rem", marginTop:4 }}>
-          Confidence: {data.confidence}
-        </div>
-      )}
     </div>
   );
 }
@@ -137,7 +94,7 @@ function parseIntoSections(text) {
 
     if (h2 || boldLabel || forLabel) {
       if (current) sections.push(current);
-      current = { heading: (h2?.[1] || boldLabel?.[1] || forLabel?.[1]).replace(/\*\*/g,""), items: [], notes: [] };
+      current = { heading: ((h2 && h2[1]) || (boldLabel && boldLabel[1]) || (forLabel && forLabel[1])).replace(/\*\*/g,""), items: [], notes: [] };
     } else if (line.match(/^[-*]\s+/) || line.match(/^\d+\.\s+/)) {
       // Bullet or numbered item
       const content = line.replace(/^[-*\d.]+\s+/, "").replace(/\*\*/g, "");
@@ -245,7 +202,7 @@ function StructuredBotMessage({ text }) {
 
 // ── Message bubble ─────────────────────────────────────────────────────────
 
-function Message({ msg }) {
+function Message({ msg, language, speakingMessageId, onSpeak, onStopSpeech }) {
   const isUser = msg.role === "user";
   return (
     <div style={{ display:"flex", flexDirection:isUser?"row-reverse":"row", gap:10, marginBottom:18, alignItems:"flex-end" }}>
@@ -259,21 +216,30 @@ function Message({ msg }) {
             ? <div style={S.userBubble}>{msg.text}</div>
             : <StructuredBotMessage text={msg.text} />
         )}
+        {!isUser && msg.text && (
+          <button type="button" onClick={()=>speakingMessageId===msg.id ? onStopSpeech() : onSpeak(msg, language)}
+            aria-label={speakingMessageId===msg.id ? "Stop spoken reply" : "Read reply aloud"}
+            title={speakingMessageId===msg.id ? "Stop spoken reply" : "Read reply aloud"}
+            style={S.speechBtn}>
+            {speakingMessageId===msg.id ? "■ Stop speaking" : "🔊 Read aloud"}
+          </button>
+        )}
         {msg.status==="weather"    && msg.data && <WeatherCard data={msg.data}/>}
         {msg.status==="crop"       && msg.data && <CropCard data={msg.data}/>}
         {msg.status==="fertilizer" && msg.data && <FertilizerCard data={msg.data}/>}
-        {msg.status==="image_analysis" && msg.data && <ImageResultCard data={msg.data}/>}
+        {msg.status==="image_analysis" && msg.data && <ImageDiagnosisCard diagnosis={msg.data}/>}
         <div style={S.timestamp}>{msg.time}</div>
       </div>
     </div>
   );
 }
 
-function TypingIndicator() {
+function TypingIndicator({ label }) {
   return (
     <div style={{ display:"flex", gap:10, alignItems:"flex-end", marginBottom:18 }}>
       <div style={S.botAvatar}>🌾</div>
       <div style={{ ...S.botBubble, padding:"14px 18px" }}>
+        <div style={{ color:"rgba(232,240,228,0.65)", fontSize:"0.8rem", marginBottom:7 }}>{label}</div>
         <div className="krishi-dots">
           <span/><span/><span/>
         </div>
@@ -289,34 +255,68 @@ export default function ChatUI({ user, onSignOut, onBack }) {
   const [input, setInput]       = useState("");
   const [loading, setLoading]   = useState(false);
   const [lang, setLang]         = useState("en");
+  const [voiceState, setVoiceState] = useState("idle");
+  const [voiceMessage, setVoiceMessage] = useState("");
+  const [voiceHasTranscript, setVoiceHasTranscript] = useState(false);
+  const [speakingMessageId, setSpeakingMessageId] = useState(null);
+  const [speechMessage, setSpeechMessage] = useState("");
   const [location, setLocation] = useState(null);
+  const [locationError, setLocationError] = useState("");
+  const [manualLatitude, setManualLatitude] = useState("");
+  const [manualLongitude, setManualLongitude] = useState("");
   const [locLoading, setLocLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [imageFile, setImageFile]       = useState(null);
+  const [imageUploadError, setImageUploadError] = useState("");
   const [chatHistory, setChatHistory]   = useState([{ id:1, title:"Current chat", active:true }]);
 
   const endRef     = useRef(null);
   const textareaRef = useRef(null);
   const fileRef    = useRef(null);
+  const requestInFlightRef = useRef(false);
+  const imageUrlsRef = useRef(new Set());
+  const pendingImageUrlRef = useRef(null);
+  const voiceControllerRef = useRef(null);
+  const speechRunRef = useRef(0);
+  const recognitionSupported = Boolean(getSpeechRecognition(typeof window !== "undefined" ? window : globalThis));
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, loading]);
+  useEffect(() => () => imageUrlsRef.current.forEach(url => URL.revokeObjectURL(url)), []);
+  useEffect(() => {
+    const Recognition = getSpeechRecognition(window);
+    const controller = new BrowserVoiceInput({
+      Recognition,
+      onState:setVoiceState,
+      onTranscript:transcript => { setInput(transcript); setVoiceHasTranscript(true); },
+      onMessage:setVoiceMessage,
+    });
+    voiceControllerRef.current = controller;
+    return () => {
+      controller.dispose();
+      voiceControllerRef.current = null;
+      speechRunRef.current += 1;
+      stopSpeech(window.speechSynthesis);
+    };
+  }, []);
 
   const now = () => new Date().toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
 
-  const addBot = (text, status, data) =>
-    setMessages(prev => [...prev, { role:"bot", text, status, data, time:now(), id:Date.now() }]);
+  const addBot = useCallback((text, status, data) =>
+    setMessages(prev => [...prev, { role:"bot", text, status, data, time:new Date().toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }), id:Date.now() }]), []);
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
-    if (!text && !imageFile) return;
-    if (loading) return;
+    if ((!text && !imageFile) || loading || voiceState !== "idle" || !tryAcquireSubmission(requestInFlightRef)) return;
+    const userMessageId = Date.now();
+    const wasVoiceTranscript = voiceHasTranscript;
 
     setMessages(prev => [...prev, {
       role:"user", text: text || "📸 Image sent",
-      imageUrl: imagePreview, time:now(), id:Date.now()
+      imageUrl: imagePreview, time:now(), id:userMessageId
     }]);
-    setInput(""); setImagePreview(null); setImageFile(null);
+    setInput("");
+    setVoiceHasTranscript(false);
     setLoading(true);
 
     try {
@@ -327,7 +327,11 @@ export default function ChatUI({ user, onSignOut, onBack }) {
         if (text) fd.append("message", text);
         const res  = await fetch(`${BACKEND}/analyze-image`, { method:"POST", body:fd });
         const data = await readApiResponse(res);
-        addBot(data.message || data.analysis || "Here's what I found in your crop image.", "image_analysis", data.data || data);
+        addBot("", "image_analysis", data.diagnosis);
+        pendingImageUrlRef.current = null;
+        setImagePreview(null);
+        setImageFile(null);
+        setImageUploadError("");
       } else {
         const res  = await fetch(`${BACKEND}/chat`, {
           method:"POST",
@@ -337,91 +341,174 @@ export default function ChatUI({ user, onSignOut, onBack }) {
             language:lang,
             lat:location?.lat,
             lon:location?.lon,
-            context:{ history: messages.filter(m => m.text && ["user", "bot"].includes(m.role)).slice(-8).map(m => ({ role:m.role === "bot" ? "assistant" : "user", content:m.text })) },
+            context:{ history: buildConversationHistory(messages) },
           }),
         });
         const data = await readApiResponse(res);
         addBot(data.message || "I couldn’t prepare a response. Please try again.", data.status, data.data);
       }
+      setVoiceMessage("");
     } catch (error) {
+      setMessages(prev => prev.filter(message => message.id !== userMessageId));
+      setInput(text);
+      setVoiceHasTranscript(wasVoiceTranscript);
       addBot(`Could not get a response: ${error.message || "check your connection and try again"}.`, "error", null);
+    } finally {
+      releaseSubmission(requestInFlightRef);
+      setLoading(false);
     }
-    setLoading(false);
-  }, [input, imageFile, imagePreview, lang, location, loading, messages]);
+  }, [input, imageFile, imagePreview, lang, location, loading, voiceState, voiceHasTranscript, messages, addBot]);
 
   const handleKey = (e) => {
-    if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    if (e.key==="Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (voiceState !== "idle") {
+        voiceControllerRef.current?.stop();
+        setVoiceMessage("Voice input stopped. Review the transcript before sending.");
+      } else handleSend();
+    }
   };
 
   const handleImage = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
     e.target.value = "";
+    if (!["image/jpeg", "image/png", "image/gif", "image/webp"].includes(file.type)) {
+      setImageUploadError("Choose a JPEG, PNG, GIF, or WebP image.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setImageUploadError("Image must be 8 MB or smaller.");
+      return;
+    }
+    if (pendingImageUrlRef.current) {
+      URL.revokeObjectURL(pendingImageUrlRef.current);
+      imageUrlsRef.current.delete(pendingImageUrlRef.current);
+    }
+    const previewUrl = URL.createObjectURL(file);
+    imageUrlsRef.current.add(previewUrl);
+    pendingImageUrlRef.current = previewUrl;
+    setImageFile(file);
+    setImagePreview(previewUrl);
+    setImageUploadError("");
+  };
+
+  const discardImagePreview = () => {
+    if (pendingImageUrlRef.current) {
+      URL.revokeObjectURL(pendingImageUrlRef.current);
+      imageUrlsRef.current.delete(pendingImageUrlRef.current);
+      pendingImageUrlRef.current = null;
+    }
+    setImagePreview(null);
+    setImageFile(null);
+    setImageUploadError("");
   };
 
   const getLocation = () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      setLocationError("Location is not supported by this browser. Enter coordinates below.");
+      return;
+    }
     setLocLoading(true);
+    setLocationError("");
     navigator.geolocation.getCurrentPosition(
-      p => { setLocation({ lat:p.coords.latitude, lon:p.coords.longitude }); setLocLoading(false); },
-      ()  => setLocLoading(false)
+      p => { setLocation({ lat:p.coords.latitude, lon:p.coords.longitude }); setLocationError(""); setLocLoading(false); },
+      error => {
+        const message = error.code === 1 ? "Location permission was denied. Allow access or enter coordinates below."
+          : error.code === 3 ? "Location lookup timed out. Try again or enter coordinates below."
+            : "Could not determine your location. Try again or enter coordinates below.";
+        setLocationError(message);
+        setLocLoading(false);
+      },
+      { enableHighAccuracy:false, timeout:10000, maximumAge:300000 }
     );
   };
 
-  // ── Voice recognition ───────────────────────────────────────────────────
-  const [listening, setListening] = useState(false);
-  const [voiceMessage, setVoiceMessage] = useState("");
-  const recognizerRef = useRef(null);
+  const setManualLocation = () => {
+    const lat = Number(manualLatitude);
+    const lon = Number(manualLongitude);
+    if (!manualLatitude.trim() || !manualLongitude.trim() || !Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      setLocationError("Enter a latitude from -90 to 90 and longitude from -180 to 180.");
+      return;
+    }
+    setLocation({ lat, lon });
+    setLocationError("");
+  };
 
   const toggleVoice = useCallback(() => {
-    if (!SpeechAPI) {
-      setVoiceMessage("Voice typing is unavailable here. Try Chrome or Edge, or type your question.");
+    const controller = voiceControllerRef.current;
+    if (!controller) {
+      setVoiceMessage("Voice input is still initializing. Please try again.");
       return;
     }
-    if (listening) {
-      recognizerRef.current?.stop();
-      setListening(false);
+    if (["starting", "listening", "stopping"].includes(voiceState)) {
+      controller.stop();
       return;
     }
-    const rec = new SpeechAPI();
-    rec.lang = LANG_SPEECH_CODE[lang] || "en-IN";
-    rec.interimResults = true;
-    rec.continuous = false;
-    rec.maxAlternatives = 3;
-    let gotResult = false;
-    setVoiceMessage("");
-    rec.onstart  = () => setListening(true);
-    rec.onend    = () => {
-      setListening(false);
-      if (!gotResult) setVoiceMessage("I didn’t catch that. Check the selected language and try speaking closer to the microphone in a quieter place.");
-    };
-    rec.onerror  = (event) => {
-      setListening(false);
-      const errors = {
-        "not-allowed": "Microphone access is blocked. Allow it in your browser settings.",
-        "no-speech": "I didn’t hear speech. Try again after the microphone starts.",
-        "audio-capture": "No microphone was found. Check that it is connected and enabled.",
-        "network": "The browser’s voice service is unavailable. Check your connection and try again.",
-      };
-      setVoiceMessage(errors[event.error] || "Voice typing stopped. Please try again or type your question.");
-    };
-    rec.onresult = (e) => {
-      gotResult = true;
-      const transcript = Array.from(e.results).map(r => r[0].transcript).join("");
-      setInput(transcript);
-      setVoiceMessage("Review the transcript and correct any words before sending.");
-      if (e.results[e.results.length - 1].isFinal) {
-        setListening(false);
-      }
-    };
-    recognizerRef.current = rec;
-    rec.start();
-  }, [listening, lang]);
+    if (loading) return;
+    const started = controller.start(lang);
+    if (started && voiceHasTranscript) {
+      setInput("");
+      setVoiceHasTranscript(false);
+    }
+  }, [voiceState, loading, lang, voiceHasTranscript]);
 
+  const changeLanguage = (code) => {
+    if (voiceState !== "idle") {
+      voiceControllerRef.current?.stop();
+      setVoiceMessage("Voice input stopped because the language changed. Start again to use the new language.");
+    }
+    if (speakingMessageId !== null) stopSpokenReply();
+    setLang(code);
+  };
+
+  const handleTranscriptEdit = (event) => {
+    const nextValue = normalizeTranscriptEdit(event.target.value);
+    if (voiceState !== "idle") {
+      voiceControllerRef.current?.stop({ discardPending:true });
+      setVoiceMessage("Voice input stopped so you can edit the transcript.");
+    }
+    setInput(nextValue);
+  };
+
+  const discardTranscript = () => {
+    setInput("");
+    setVoiceHasTranscript(false);
+    setVoiceMessage("");
+  };
+
+  const stopSpokenReply = useCallback(() => {
+    speechRunRef.current += 1;
+    stopSpeech(window.speechSynthesis);
+    setSpeakingMessageId(null);
+    setSpeechMessage("Spoken reply stopped.");
+  }, []);
+
+  const speakReply = useCallback((message, language) => {
+    const requestId = ++speechRunRef.current;
+    const result = speakText(message, language, window, {
+      onStart:() => { if (speechRunRef.current === requestId) { setSpeakingMessageId(message.id); setSpeechMessage(""); } },
+      onEnd:() => { if (speechRunRef.current === requestId) setSpeakingMessageId(null); },
+      onError:() => { if (speechRunRef.current === requestId) { setSpeakingMessageId(null); setSpeechMessage("Spoken reply stopped unexpectedly. Try again or read the text."); } },
+    });
+    if (!result.ok) {
+      setSpeakingMessageId(null);
+      setSpeechMessage(result.message);
+    } else {
+      setSpeakingMessageId(message.id);
+      setSpeechMessage("");
+    }
+  }, []);
   const newChat = () => {
-    setMessages([]); setInput(""); setImagePreview(null); setImageFile(null);
+    voiceControllerRef.current?.cancel();
+    stopSpokenReply();
+    setVoiceHasTranscript(false);
+    setVoiceMessage("");
+    setSpeechMessage("");
+    imageUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    imageUrlsRef.current.clear();
+    pendingImageUrlRef.current = null;
+    setMessages([]); setInput(""); setImagePreview(null); setImageFile(null); setImageUploadError("");
     setSidebarOpen(false);
     setChatHistory(prev => [{ id:Date.now(), title:"New chat", active:true }, ...prev.map(c=>({...c,active:false}))]);
   };
@@ -446,7 +533,7 @@ export default function ChatUI({ user, onSignOut, onBack }) {
             {LANG_OPTIONS.map(l=>(
               <button type="button" key={l.code}
                 className={`krishi-lang-btn${lang===l.code?" active":""}`}
-                onClick={()=>setLang(l.code)}
+                onClick={()=>changeLanguage(l.code)}
                 style={S.langBtn}>{l.label}</button>
             ))}
           </div>
@@ -504,7 +591,7 @@ export default function ChatUI({ user, onSignOut, onBack }) {
               {LANG_OPTIONS.map(l=>(
                 <button type="button" key={l.code}
                   className={`krishi-lang-btn${lang===l.code?" active":""}`}
-                  onClick={()=>setLang(l.code)}
+                  onClick={()=>changeLanguage(l.code)}
                   style={S.langBtn}>{l.label}</button>
               ))}
             </div>
@@ -537,8 +624,8 @@ export default function ChatUI({ user, onSignOut, onBack }) {
             </div>
           ) : (
             <>
-              {messages.map(m=><Message key={m.id} msg={m}/>)}
-              {loading && <TypingIndicator/>}
+              {messages.map(m=><Message key={m.id} msg={m} language={lang} speakingMessageId={speakingMessageId} onSpeak={speakReply} onStopSpeech={stopSpokenReply}/>)}
+              {loading && <TypingIndicator label={imageFile ? "Analyzing your crop image…" : "KrishiBot is thinking…"}/>}
             </>
           )}
           <div ref={endRef}/>
@@ -548,15 +635,16 @@ export default function ChatUI({ user, onSignOut, onBack }) {
         <div style={S.inputWrap}>
           {imagePreview && (
             <div style={S.imgPreviewBar}>
-              <img src={imagePreview} alt="" style={{ width:52,height:52,objectFit:"cover",borderRadius:9,border:"1px solid rgba(106,170,122,0.25)" }}/>
-              <span style={{ color:"rgba(232,240,228,0.55)", fontSize:"0.8rem" }}>Image ready to send</span>
-              <button style={{ ...S.iBtn, marginLeft:"auto" }} onClick={()=>{ setImagePreview(null); setImageFile(null); }}>✕</button>
+              <img src={imagePreview} alt="Selected crop preview" style={{ width:72,height:72,objectFit:"cover",borderRadius:9,border:"1px solid rgba(106,170,122,0.25)" }}/>
+              <span style={{ color:"rgba(232,240,228,0.7)", fontSize:"0.8rem" }}>{loading ? "Image is being analyzed…" : "Crop image ready to send"}</span>
+              <button style={{ ...S.iBtn, marginLeft:"auto" }} onClick={discardImagePreview} disabled={loading} aria-label="Remove selected crop image">✕</button>
             </div>
           )}
+          {imageUploadError && <div role="alert" style={{ color:"#f4a261", fontSize:"0.8rem", marginBottom:7 }}>{imageUploadError}</div>}
           <div style={S.inputBar}>
-            <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }} onChange={handleImage}/>
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" style={{ display:"none" }} onChange={handleImage} disabled={loading}/>
             <button style={{ ...S.iBtn, color: imageFile ? "#6aaa7a" : "rgba(232,240,228,0.3)" }}
-              onClick={()=>fileRef.current?.click()} title="Upload crop photo">
+              onClick={()=>fileRef.current?.click()} title="Upload crop photo" disabled={loading}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
               </svg>
@@ -570,33 +658,54 @@ export default function ChatUI({ user, onSignOut, onBack }) {
             <textarea
               ref={textareaRef}
               value={input}
-              onChange={e=>setInput(e.target.value)}
+              onChange={handleTranscriptEdit}
               onKeyDown={handleKey}
-              placeholder={listening ? "🎙 Listening…" : "Ask in English, Hindi or Kannada…"}
+              placeholder={voiceState === "listening" ? "🎙 Listening…" : "Ask in English, Hindi or Kannada…"}
               rows={1}
-              style={{ ...S.textarea, ...(listening ? { color:"#6aaa7a" } : {}) }}
+              style={{ ...S.textarea, ...(voiceState === "listening" ? { color:"#6aaa7a" } : {}) }}
               onInput={e=>{ e.target.style.height="auto"; e.target.style.height=Math.min(e.target.scrollHeight,120)+"px"; }}
             />
             {/* Mic button — always visible */}
             <button type="button"
-              style={{ ...S.iBtn, color: listening ? "#f87171" : SpeechAPI ? "rgba(232,240,228,0.3)" : "rgba(232,240,228,0.15)", position:"relative" }}
+              style={{ ...S.iBtn, color: voiceState === "listening" ? "#f87171" : recognitionSupported ? "rgba(232,240,228,0.3)" : "rgba(232,240,228,0.15)", position:"relative" }}
               onClick={toggleVoice}
-              title={!SpeechAPI ? "Voice not supported — use Chrome" : listening ? "Stop listening" : "Speak your question"}>
-              {listening
+              disabled={loading}
+              aria-label={["starting", "listening", "stopping"].includes(voiceState) ? "Stop voice input" : `Start voice input in ${lang === "en" ? "English India" : lang === "hi" ? "Hindi" : "Kannada"}`}
+              aria-pressed={voiceState === "listening"}
+              title={!recognitionSupported ? "Voice input is not supported in this browser" : voiceState === "listening" ? "Stop listening" : `Speak in ${lang === "en" ? "English (India)" : lang === "hi" ? "Hindi" : "Kannada"}`}>
+              {voiceState === "listening"
                 ? <svg width="18" height="18" viewBox="0 0 24 24" fill="#f87171" stroke="#f87171" strokeWidth="1"><rect x="9" y="9" width="6" height="6" rx="1"/><path fill="none" strokeWidth="2" d="M12 1a3 3 0 0 1 3 3v4a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path fill="none" strokeWidth="2" d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                 : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 1 3 3v4a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
               }
-              {listening && <span style={S.micPulse}/>}
+              {voiceState === "listening" && <span style={S.micPulse}/>}
             </button>
             <button style={{ ...S.sendBtn, opacity:(input.trim()||imageFile)&&!loading?1:0.4 }}
-              onClick={handleSend} disabled={loading||(!input.trim()&&!imageFile)} className="krishi-send">
+              onClick={handleSend} disabled={loading||voiceState!=="idle"||(!input.trim()&&!imageFile)} className="krishi-send">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
               </svg>
             </button>
           </div>
+          {locationError && <div role="alert" style={{ color:"#f4a261", fontSize:"0.75rem", marginTop:7 }}>{locationError}</div>}
+          <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:7 }}>
+            <span style={{ color:"rgba(232,240,228,0.48)", fontSize:"0.7rem" }}>Manual coordinates</span>
+            <input aria-label="Latitude" type="number" min="-90" max="90" step="any" placeholder="Latitude" value={manualLatitude} onChange={e=>setManualLatitude(e.target.value)} style={S.locationInput}/>
+            <input aria-label="Longitude" type="number" min="-180" max="180" step="any" placeholder="Longitude" value={manualLongitude} onChange={e=>setManualLongitude(e.target.value)} style={S.locationInput}/>
+            <button type="button" onClick={setManualLocation} style={{ ...S.iBtn, color:"#b5d6a0", fontSize:"0.7rem", width:"auto" }}>Use</button>
+          </div>
           <div style={S.hint}>
-            {voiceMessage && <span style={{ color:voiceMessage.startsWith("Review") ? "#6aaa7a" : "#f4a261" }}>{voiceMessage}<br /></span>}
+            {voiceState === "starting" && <div role="status" aria-live="polite">Starting microphone access…</div>}
+            {voiceState === "listening" && <div role="status" aria-live="polite">Listening in {lang === "en" ? "English (India)" : lang === "hi" ? "Hindi" : "Kannada"}. Speak now, or tap the microphone to stop.</div>}
+            {voiceState === "stopping" && <div role="status" aria-live="polite">Finishing voice input…</div>}
+            {voiceMessage && <div role="status" aria-live="polite" aria-atomic="true" style={{ color:voiceHasTranscript ? "#6aaa7a" : "#f4a261" }}>
+              {voiceMessage}
+              {voiceHasTranscript && voiceState === "idle" && <div style={{ display:"inline-flex", gap:8, marginLeft:8 }}>
+                <button type="button" onClick={toggleVoice} disabled={loading} style={S.voiceAction}>Retry</button>
+                <button type="button" onClick={discardTranscript} disabled={loading} style={S.voiceAction}>Discard transcript</button>
+              </div>}
+              {!voiceHasTranscript && voiceState === "idle" && recognitionSupported && <button type="button" onClick={toggleVoice} disabled={loading} style={{ ...S.voiceAction, marginLeft:8 }}>Try again</button>}
+            </div>}
+            {speechMessage && <div role="status" aria-live="polite" style={{ color:"#f4a261" }}>{speechMessage}</div>}
             Enter to send · Shift+Enter new line
             {location && <span style={{ color:"#6aaa7a" }}> · 📍 Location active</span>}
           </div>
@@ -633,6 +742,9 @@ const S = {
   inputWrap:  { padding:"11px 16px 15px", borderTop:"1px solid rgba(106,170,122,0.1)", background:"rgba(13,20,11,0.96)", flexShrink:0 },
   imgPreviewBar:{ display:"flex", alignItems:"center", gap:10, padding:"8px 11px", background:"rgba(106,170,122,0.07)", border:"1px solid rgba(106,170,122,0.17)", borderRadius:11, marginBottom:9 },
   inputBar:   { display:"flex", alignItems:"flex-end", gap:7, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(106,170,122,0.17)", borderRadius:18, padding:"7px 9px 7px 11px" },
+  locationInput:{ width:90, minWidth:0, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(106,170,122,0.17)", borderRadius:7, color:"#e8f0e4", padding:"5px 6px", fontSize:"0.72rem" },
+  voiceAction:{ border:"1px solid rgba(106,170,122,0.28)", borderRadius:7, background:"rgba(106,170,122,0.08)", color:"#b5d6a0", padding:"3px 7px", fontSize:"0.68rem", cursor:"pointer" },
+  speechBtn:{ border:"1px solid rgba(106,170,122,0.2)", borderRadius:8, background:"rgba(106,170,122,0.06)", color:"#b5d6a0", padding:"4px 8px", fontSize:"0.72rem", cursor:"pointer", alignSelf:"flex-start" },
   textarea:   { flex:1, background:"none", border:"none", outline:"none", color:"#e8f0e4", fontFamily:"'Nunito',sans-serif", fontSize:"0.91rem", lineHeight:1.55, resize:"none", minHeight:22, maxHeight:120, paddingTop:3, scrollbarWidth:"none" },
   sendBtn:    { width:34, height:34, borderRadius:"50%", background:"linear-gradient(135deg,#4a7c59,#6aaa7a)", border:"none", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", flexShrink:0, transition:"opacity 0.15s,transform 0.15s", boxShadow:"0 3px 12px rgba(74,124,89,0.38)" },
   hint:       { fontSize:"0.69rem", color:"rgba(232,240,228,0.2)", textAlign:"center", marginTop:7, fontWeight:600 },

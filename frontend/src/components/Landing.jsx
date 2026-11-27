@@ -33,6 +33,12 @@ const howItWorks = [
   { step: "03", title: "Get actionable advice", desc: "Specific quantities, timings, and product names — not generic tips.", icon: "✅" },
 ];
 
+const particles = Array.from({ length:18 }, (_, i) => ({
+  top:`${Math.random() * 100}%`, left:`${Math.random() * 100}%`,
+  animation:`float${i % 3} ${4 + (i % 4)}s ease-in-out infinite`,
+  animationDelay:`${(i * 0.4) % 3}s`, opacity:0.4 + (i % 3) * 0.15,
+}));
+
 function Particle({ style }) {
   return <div style={{ position: "absolute", width: 6, height: 6, borderRadius: "50%", background: "rgba(106,170,122,0.35)", ...style }} />;
 }
@@ -77,12 +83,6 @@ export default function Landing({ onEnter, onLoginClick, user, onSignOut }) {
     draw();
     return () => cancelAnimationFrame(frame);
   }, []);
-
-  const particles = Array.from({ length: 18 }, (_, i) => ({
-    top: `${Math.random() * 100}%`, left: `${Math.random() * 100}%`,
-    animation: `float${i % 3} ${4 + (i % 4)}s ease-in-out infinite`,
-    animationDelay: `${(i * 0.4) % 3}s`, opacity: 0.4 + (i % 3) * 0.15,
-  }));
 
   const handleNavFeatureClick = (item) => {
     setShowFeaturesDropdown(false);
